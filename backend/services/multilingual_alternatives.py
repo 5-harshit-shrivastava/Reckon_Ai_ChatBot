@@ -76,22 +76,28 @@ class HuggingFaceRAGService(MultilingualRAGService):
         # pip install transformers torch
         self.model_name = "microsoft/DialoGPT-medium"  # Or "ai4bharat/indic-bert"
         
+    def detect_language(self, text: str) -> str:
+        """Detect language - simple Hindi/English detection"""
+        # Check for Hindi characters (Devanagari script)
+        hindi_chars = any('\u0900' <= char <= '\u097F' for char in text)
+        return "hi" if hindi_chars else "en"
+
     def generate_response(self, query: str, context: str, language: str) -> Dict:
         """Generate response using local transformers"""
         try:
             from transformers import pipeline, AutoTokenizer, AutoModelForCausalLM
-            
+
             # For Hindi: Use AI4Bharat models
             if language == "hi":
                 model_name = "ai4bharat/indic-bert"
             else:
                 model_name = "microsoft/DialoGPT-medium"
-            
+
             generator = pipeline('text-generation', model=model_name)
-            
+
             prompt = f"Context: {context}\nQuestion: {query}\nAnswer:"
             response = generator(prompt, max_length=200, num_return_sequences=1)
-            
+
             return {
                 "success": True,
                 "response": response[0]['generated_text'],

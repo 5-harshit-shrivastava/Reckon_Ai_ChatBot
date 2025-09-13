@@ -75,34 +75,76 @@ class VectorSearchService:
     
     def create_embedding(self, text: str, is_query: bool = False) -> List[float]:
         """
-        Create embedding for text using multilingual-e5-large model
-        
+        Create embedding for text using HuggingFace API (deployment-friendly)
+
         Args:
             text: Text to embed
             is_query: Whether this is a query (True) or passage (False)
-            
+
         Returns:
             List of embedding values (1024 dimensions)
         """
+        try:
+            # Use HuggingFace API instead of local model
+            import requests
+
+            hf_token = os.getenv("HUGGINGFACE_API_TOKEN")
+            if not hf_token:
+                logger.warning("No HuggingFace API token found, falling back to sentence-transformers")
+                return self._create_embedding_local(text, is_query)
+
+            # Add appropriate prefix as required by E5 models
+            if is_query:
+                prefixed_text = f"query: {text}"
+            else:
+                prefixed_text = f"passage: {text}"
+
+            # Call HuggingFace API
+            api_url = f"https://api-inference.huggingface.co/pipeline/feature-extraction/{self.embedding_model}"
+            headers = {"Authorization": f"Bearer {hf_token}"}
+
+            response = requests.post(
+                api_url,
+                headers=headers,
+                json={"inputs": prefixed_text, "options": {"wait_for_model": True}}
+            )
+
+            if response.status_code == 200:
+                embedding = response.json()
+                # Normalize the embedding
+                import numpy as np
+                embedding = np.array(embedding)
+                embedding = embedding / np.linalg.norm(embedding)
+                return embedding.tolist()
+            else:
+                logger.error(f"HuggingFace API error: {response.status_code}")
+                return self._create_embedding_local(text, is_query)
+
+        except Exception as e:
+            logger.error(f"Error creating embedding via API: {e}")
+            return self._create_embedding_local(text, is_query)
+
+    def _create_embedding_local(self, text: str, is_query: bool = False) -> List[float]:
+        """Fallback to local embedding generation"""
         try:
             # Initialize sentence transformer if needed
             if self.sentence_transformer is None:
                 logger.info(f"Initializing multilingual embedding model: {self.embedding_model}")
                 from sentence_transformers import SentenceTransformer
                 self.sentence_transformer = SentenceTransformer(self.embedding_model)
-            
+
             # Add appropriate prefix as required by E5 models
             if is_query:
                 prefixed_text = f"query: {text}"
             else:
                 prefixed_text = f"passage: {text}"
-            
+
             # Create embedding using multilingual-e5-large
             embedding = self.sentence_transformer.encode(prefixed_text, normalize_embeddings=True)
             return embedding.tolist()
-                
+
         except Exception as e:
-            logger.error(f"Error creating embedding: {e}")
+            logger.error(f"Error creating local embedding: {e}")
             # Return zero vector as fallback
             return [0.0] * self.vector_dimension
     
