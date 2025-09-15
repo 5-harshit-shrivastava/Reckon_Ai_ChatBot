@@ -18,10 +18,12 @@ class VectorSearchService:
         self.pinecone_client = None
         self.pinecone_index = None
         self.sentence_transformer = None
-        # Use Hugging Face multilingual-e5-large model
-        self.embedding_model = "intfloat/multilingual-e5-large"
-        self.index_name = "reckon-multilingual-kb"
-        self.vector_dimension = 1024  # Dimension for multilingual-e5-large
+        # Use ONLY Google EmbeddingGemma - no fallbacks for consistency
+        self.embedding_model = "google/embeddinggemma-300m"
+        self.vector_dimension = 768  # EmbeddingGemma dimensions
+        self.context_length = 2048  # EmbeddingGemma context length
+        self.model_description = "Google EmbeddingGemma - Premium multilingual embeddings"
+        self.index_name = "reckon-embeddinggemma-kb"
         self.initialize_services()
     
     def initialize_services(self):
@@ -40,10 +42,10 @@ class VectorSearchService:
                 if self.index_name not in index_names:
                     logger.info(f"Creating Pinecone multilingual index: {self.index_name}")
                     
-                    # Create index with multilingual-e5-large dimensions
+                    # Create index with Google EmbeddingGemma dimensions
                     self.pinecone_client.create_index(
                         name=self.index_name,
-                        dimension=self.vector_dimension,  # 1024 for multilingual-e5-large
+                        dimension=self.vector_dimension,  # 768 for Google EmbeddingGemma
                         metric="cosine",
                         spec=ServerlessSpec(
                             cloud="aws", 
@@ -75,76 +77,132 @@ class VectorSearchService:
     
     def create_embedding(self, text: str, is_query: bool = False) -> List[float]:
         """
-        Create embedding for text using HuggingFace API (deployment-friendly)
+        Create embedding using ONLY Google EmbeddingGemma
 
         Args:
             text: Text to embed
             is_query: Whether this is a query (True) or passage (False)
 
         Returns:
-            List of embedding values (1024 dimensions)
+            List of embedding values (768 dimensions for EmbeddingGemma)
         """
         try:
-            # Use HuggingFace API instead of local model
-            import requests
+            # Truncate text if too long
+            if len(text) > self.context_length:
+                text = text[:self.context_length]
+                logger.info(f"Truncated text to {self.context_length} characters")
 
-            hf_token = os.getenv("HUGGINGFACE_API_TOKEN")
-            if not hf_token:
-                logger.warning("No HuggingFace API token found, falling back to sentence-transformers")
-                return self._create_embedding_local(text, is_query)
+            logger.info(f"Creating embedding with Google EmbeddingGemma")
 
-            # Add appropriate prefix as required by E5 models
-            if is_query:
-                prefixed_text = f"query: {text}"
+            # Try local model first (more reliable for gated models)
+            embedding = self._create_embedding_local(text, is_query)
+
+            if embedding and len(embedding) == self.vector_dimension and sum(abs(x) for x in embedding) > 0.1:
+                logger.info(f"✅ Google EmbeddingGemma local success - {len(embedding)} dimensions")
+                return embedding
+
+            # If local fails, try API as fallback
+            logger.warning("Local model failed, trying Google EmbeddingGemma API")
+            embedding = self._create_embedding_with_api(text, self.embedding_model, is_query)
+
+            if embedding and len(embedding) == self.vector_dimension:
+                logger.info(f"✅ Google EmbeddingGemma local success - {len(embedding)} dimensions")
+                return embedding
             else:
-                prefixed_text = f"passage: {text}"
-
-            # Call HuggingFace API
-            api_url = f"https://api-inference.huggingface.co/pipeline/feature-extraction/{self.embedding_model}"
-            headers = {"Authorization": f"Bearer {hf_token}"}
-
-            response = requests.post(
-                api_url,
-                headers=headers,
-                json={"inputs": prefixed_text, "options": {"wait_for_model": True}}
-            )
-
-            if response.status_code == 200:
-                embedding = response.json()
-                # Normalize the embedding
-                import numpy as np
-                embedding = np.array(embedding)
-                embedding = embedding / np.linalg.norm(embedding)
-                return embedding.tolist()
-            else:
-                logger.error(f"HuggingFace API error: {response.status_code}")
-                return self._create_embedding_local(text, is_query)
+                logger.error(f"Local model returned wrong dimensions: {len(embedding) if embedding else 0}")
+                return [0.0] * self.vector_dimension
 
         except Exception as e:
-            logger.error(f"Error creating embedding via API: {e}")
-            return self._create_embedding_local(text, is_query)
+            logger.error(f"Google EmbeddingGemma failed: {e}")
+            # Return zero vector as last resort
+            return [0.0] * self.vector_dimension
+
+    def _create_embedding_with_api(self, text: str, model_name: str, is_query: bool = False) -> List[float]:
+        """Create embedding via HuggingFace API for Google EmbeddingGemma"""
+        import requests
+
+        hf_token = os.getenv("HUGGINGFACE_API_TOKEN")
+        if not hf_token:
+            raise Exception("No HuggingFace API token found")
+
+        # EmbeddingGemma doesn't need query/passage prefixes
+        formatted_text = text
+
+        # Call HuggingFace API
+        api_url = f"https://api-inference.huggingface.co/pipeline/feature-extraction/{model_name}"
+        headers = {"Authorization": f"Bearer {hf_token}"}
+
+        response = requests.post(
+            api_url,
+            headers=headers,
+            json={"inputs": formatted_text, "options": {"wait_for_model": True}},
+            timeout=30
+        )
+
+        if response.status_code == 200:
+            embedding = response.json()
+            # Normalize the embedding
+            import numpy as np
+            embedding = np.array(embedding)
+
+            # Ensure correct dimensions for EmbeddingGemma
+            if len(embedding) != self.vector_dimension:
+                logger.warning(f"API returned {len(embedding)} dimensions, expected {self.vector_dimension}")
+
+            embedding = embedding / np.linalg.norm(embedding)
+            return embedding.tolist()
+        else:
+            raise Exception(f"API error: {response.status_code} - {response.text}")
+
+    def _normalize_embedding_dimensions(self, embedding: List[float], target_dim: int) -> List[float]:
+        """Normalize embedding to target dimensions"""
+        import numpy as np
+
+        embedding_array = np.array(embedding)
+
+        if len(embedding) > target_dim:
+            # Truncate to target dimensions
+            return embedding_array[:target_dim].tolist()
+        elif len(embedding) < target_dim:
+            # Pad with zeros
+            padded = np.zeros(target_dim)
+            padded[:len(embedding)] = embedding_array
+            return padded.tolist()
+        else:
+            return embedding
 
     def _create_embedding_local(self, text: str, is_query: bool = False) -> List[float]:
-        """Fallback to local embedding generation"""
+        """Local Google EmbeddingGemma generation"""
         try:
             # Initialize sentence transformer if needed
             if self.sentence_transformer is None:
-                logger.info(f"Initializing multilingual embedding model: {self.embedding_model}")
+                logger.info(f"Initializing Google EmbeddingGemma locally: {self.embedding_model}")
+
+                # Login to HuggingFace first
+                hf_token = os.getenv("HUGGINGFACE_API_TOKEN")
+                if hf_token:
+                    from huggingface_hub import login
+                    login(token=hf_token, add_to_git_credential=False)
+                    logger.info("Logged into HuggingFace")
+
                 from sentence_transformers import SentenceTransformer
                 self.sentence_transformer = SentenceTransformer(self.embedding_model)
 
-            # Add appropriate prefix as required by E5 models
-            if is_query:
-                prefixed_text = f"query: {text}"
-            else:
-                prefixed_text = f"passage: {text}"
+            # EmbeddingGemma doesn't need query/passage prefixes
+            formatted_text = text
 
-            # Create embedding using multilingual-e5-large
-            embedding = self.sentence_transformer.encode(prefixed_text, normalize_embeddings=True)
+            # Create embedding using Google EmbeddingGemma
+            embedding = self.sentence_transformer.encode(formatted_text, normalize_embeddings=True)
+
+            # Verify dimensions
+            if len(embedding) != self.vector_dimension:
+                logger.error(f"Local model returned {len(embedding)} dimensions, expected {self.vector_dimension}")
+                return [0.0] * self.vector_dimension
+
             return embedding.tolist()
 
         except Exception as e:
-            logger.error(f"Error creating local embedding: {e}")
+            logger.error(f"Error creating local Google EmbeddingGemma embedding: {e}")
             # Return zero vector as fallback
             return [0.0] * self.vector_dimension
     
@@ -205,7 +263,7 @@ class VectorSearchService:
                     vectors=vectors,
                     namespace="reckon-knowledge-base"
                 )
-                logger.info(f"Stored {len(vectors)} chunks in Pinecone using multilingual-e5-large embeddings")
+                logger.info(f"Stored {len(vectors)} chunks in Pinecone using Google EmbeddingGemma embeddings")
             
             db.commit()
             return stored_count
@@ -252,7 +310,7 @@ class VectorSearchService:
                 # Create query embedding (with query prefix)
                 query_embedding = self.create_embedding(query, is_query=True)
                 
-                # Search using vector query with multilingual-e5-large
+                # Search using vector query with Google EmbeddingGemma
                 search_response = self.pinecone_index.query(
                     namespace="reckon-knowledge-base",
                     vector=query_embedding,

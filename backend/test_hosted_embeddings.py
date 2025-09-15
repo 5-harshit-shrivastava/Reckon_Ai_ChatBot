@@ -35,8 +35,8 @@ def test_hosted_embeddings_index():
         # Initialize Pinecone
         pc = Pinecone(api_key=api_key)
         
-        # Test index name with hosted embeddings
-        index_name = "reckon-multilingual-test"
+        # Test index name with Google EmbeddingGemma
+        index_name = "reckon-embeddinggemma-test"
         
         # List existing indexes
         indexes = pc.list_indexes()
@@ -57,13 +57,13 @@ def test_hosted_embeddings_index():
             # Approach 1: Using model parameter
             pc.create_index(
                 name=index_name,
-                dimension=1024,  # multilingual-e5-large dimension
+                dimension=768,  # Google EmbeddingGemma dimension
                 metric="cosine",
                 spec=ServerlessSpec(
                     cloud="aws",
                     region="us-east-1"
                 ),
-                model="multilingual-e5-large"  # Specify hosted model
+                model="google/embeddinggemma-300m"  # Specify Google EmbeddingGemma
             )
             print("✅ Index created with model parameter")
         except Exception as e:
@@ -73,7 +73,7 @@ def test_hosted_embeddings_index():
             try:
                 pc.create_index(
                     name=index_name,
-                    dimension=1024,
+                    dimension=768,
                     metric="cosine",
                     spec=ServerlessSpec(
                         cloud="aws",

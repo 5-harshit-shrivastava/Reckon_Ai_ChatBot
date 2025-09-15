@@ -1,29 +1,29 @@
 #!/usr/bin/env python3
 """
 Simple test for HuggingFace multilingual embeddings
-Tests the intfloat/multilingual-e5-large model directly
+Tests the Google EmbeddingGemma model directly
 """
 
 def test_multilingual_embeddings():
-    """Test the multilingual-e5-large model"""
-    print("🚀 Testing HuggingFace multilingual-e5-large model")
+    """Test the Google EmbeddingGemma model"""
+    print("🚀 Testing Google EmbeddingGemma model")
     print("=" * 50)
 
     try:
         from sentence_transformers import SentenceTransformer
         import numpy as np
 
-        # Initialize the multilingual model
-        print("📥 Loading multilingual-e5-large model...")
-        model = SentenceTransformer('intfloat/multilingual-e5-large')
+        # Initialize the Google EmbeddingGemma model
+        print("📥 Loading Google EmbeddingGemma model...")
+        model = SentenceTransformer('google/embeddinggemma-300m')
         print("✅ Model loaded successfully!")
 
-        # Test texts in different languages
+        # Test texts in different languages (EmbeddingGemma doesn't need prefixes)
         test_texts = {
-            "English": "query: ReckonSales inventory management system",
-            "Hindi": "query: ReckonSales इन्वेंटरी प्रबंधन प्रणाली",
-            "English_passage": "passage: ReckonSales helps manage inventory and billing",
-            "Hindi_passage": "passage: ReckonSales इन्वेंट्री और बिलिंग का प्रबंधन करता है"
+            "English": "ReckonSales inventory management system",
+            "Hindi": "ReckonSales इन्वेंटरी प्रबंधन प्रणाली",
+            "English_passage": "ReckonSales helps manage inventory and billing",
+            "Hindi_passage": "ReckonSales इन्वेंट्री और बिलिंग का प्रबंधन करता है"
         }
 
         embeddings = {}

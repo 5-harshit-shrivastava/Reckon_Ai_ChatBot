@@ -11,8 +11,8 @@ def test_embedding_generation():
         from sentence_transformers import SentenceTransformer
         import numpy as np
 
-        # Load the exact model used in your system
-        model = SentenceTransformer('intfloat/multilingual-e5-large')
+        # Load the exact model used in your system - Google EmbeddingGemma
+        model = SentenceTransformer('google/embeddinggemma-300m')
 
         # Test various scenarios
         test_cases = [
@@ -29,8 +29,8 @@ def test_embedding_generation():
             print(f"  ✅ {label}: {embedding.shape} dimensions")
 
             # Verify embedding quality
-            if len(embedding) != 1024:
-                print(f"  ❌ Wrong dimension: expected 1024, got {len(embedding)}")
+            if len(embedding) != 768:
+                print(f"  ❌ Wrong dimension: expected 768, got {len(embedding)}")
                 return False
 
             if np.isnan(embedding).any():
@@ -158,7 +158,7 @@ def test_vector_search_service():
             passage_emb = vector_service.create_embedding(text, is_query=False)
             print(f"  ✅ Passage embedding: {len(passage_emb)} dims")
 
-            if len(query_emb) != 1024 or len(passage_emb) != 1024:
+            if len(query_emb) != 768 or len(passage_emb) != 768:
                 print(f"  ❌ Wrong embedding dimensions")
                 return False
 

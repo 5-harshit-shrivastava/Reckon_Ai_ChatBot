@@ -15,6 +15,7 @@ from routes.users import router as users_router
 from routes.chat_sessions import router as chat_sessions_router
 from routes.chat_messages import router as chat_messages_router
 from routes.knowledge_base import router as knowledge_router
+from routes.test_endpoints import router as test_router
 
 # Create FastAPI instance
 app = FastAPI(
@@ -60,6 +61,7 @@ app.include_router(users_router)
 app.include_router(chat_sessions_router)
 app.include_router(chat_messages_router)
 app.include_router(knowledge_router)
+app.include_router(test_router)
 
 if __name__ == "__main__":
     import uvicorn

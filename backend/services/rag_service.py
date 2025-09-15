@@ -5,7 +5,7 @@ from typing import List, Dict, Optional, Tuple
 from sqlalchemy.orm import Session
 from openai import OpenAI
 from services.vector_search import VectorSearchService
-from services.multilingual_alternatives import HuggingFaceRAGService, get_recommended_setup
+from services.gemini_service import GeminiService
 from models.knowledge_base import Document, DocumentChunk, KnowledgeBaseQuery
 from models.chat import ChatSession
 from models.user import User
@@ -20,32 +20,26 @@ class RAGService:
     
     def __init__(self):
         self.vector_search = VectorSearchService()
-        self.openai_client = None
-        self.huggingface_service = None
-        self.model_name = "gpt-3.5-turbo"  # More accessible model
+        self.gemini_service = None
+        self.model_name = "gemini-pro"  # Primary model
         self.max_context_tokens = 8000  # Leave room for response
         self.initialize_services()
     
     def initialize_services(self):
-        """Initialize OpenAI and HuggingFace services"""
+        """Initialize Google Gemini Pro service"""
         try:
-            # Try to initialize OpenAI first
-            openai_api_key = os.getenv("OPENAI_API_KEY")
-            if openai_api_key:
-                self.openai_client = OpenAI(api_key=openai_api_key)
-                logger.info("OpenAI client initialized for RAG service")
-            else:
-                logger.warning("OpenAI API key not found, will use HuggingFace as fallback")
+            # Initialize Google Gemini Pro service
+            self.gemini_service = GeminiService()
+            logger.info("Google Gemini Pro service initialized for RAG")
 
-            # Initialize HuggingFace service as fallback
-            try:
-                self.huggingface_service = HuggingFaceRAGService()
-                logger.info("HuggingFace multilingual service initialized as fallback")
-            except Exception as hf_error:
-                logger.warning(f"HuggingFace service initialization failed: {hf_error}")
+            # Test connection
+            if self.gemini_service.test_connection():
+                logger.info("Gemini Pro connection test successful")
+            else:
+                logger.error("Gemini Pro connection test failed")
 
         except Exception as e:
-            logger.error(f"Error initializing services: {e}")
+            logger.error(f"Error initializing Gemini service: {e}")
     
     def generate_rag_response(
         self,
@@ -212,138 +206,54 @@ class RAGService:
         session_id: int = None,
         db: Session = None
     ) -> Dict:
-        """Generate response using OpenAI GPT-4 or HuggingFace with ReckonSales context"""
+        """Generate response using Google Gemini Pro with ReckonSales context"""
 
-        # Try OpenAI first
-        if self.openai_client:
-            return self._generate_openai_response(user_query, context, industry_context, language, session_id, db)
+        # Use Google Gemini Pro exclusively
+        if self.gemini_service and self.gemini_service.client:
+            return self._generate_gemini_response(user_query, context, industry_context, language, session_id)
 
-        # Fall back to HuggingFace if OpenAI is not available
-        elif self.huggingface_service:
-            return self._generate_huggingface_response(user_query, context, language)
-
-        # If neither service is available
+        # If Gemini is not available, return error
         else:
             return {
                 "success": False,
-                "response": self._get_fallback_response(user_query, language),
-                "confidence": 0.3,
-                "model_used": "fallback_text"
+                "response": "Google Gemini Pro service is not available. Please check your API key.",
+                "confidence": 0.0,
+                "model_used": "none"
             }
 
-    def _generate_openai_response(
+    def _generate_gemini_response(
         self,
         user_query: str,
         context: str,
         industry_context: str = None,
         language: str = "en",
-        session_id: int = None,
-        db: Session = None
+        session_id: int = None
     ) -> Dict:
-        """Generate response using OpenAI GPT"""
+        """Generate response using Google Gemini Pro"""
         try:
-            # Build the system prompt
-            system_prompt = self._build_system_prompt(industry_context, language)
-
-            # Build the user prompt with context
-            user_prompt = self._build_user_prompt(user_query, context, language)
-
-            # Get conversation history for better context
-            conversation_history = self._get_conversation_history(db, session_id) if session_id else []
-
-            # Build messages array
-            messages = [{"role": "system", "content": system_prompt}]
-
-            # Add recent conversation history
-            messages.extend(conversation_history[-4:])  # Last 4 messages for context
-
-            # Add current query
-            messages.append({"role": "user", "content": user_prompt})
-
-            # Generate response
-            response = self.openai_client.chat.completions.create(
-                model=self.model_name,
-                messages=messages,
-                temperature=0.7,
-                max_tokens=800,
-                top_p=0.9,
-                frequency_penalty=0.1,
-                presence_penalty=0.1
-            )
-
-            ai_response = response.choices[0].message.content.strip()
-
-            # Calculate confidence based on response quality
-            confidence = self._calculate_response_confidence(ai_response, context)
-
-            return {
-                "success": True,
-                "response": ai_response,
-                "confidence": confidence,
-                "tokens_used": response.usage.total_tokens,
-                "model_used": self.model_name
-            }
-
-        except Exception as e:
-            logger.error(f"Error generating OpenAI response: {e}")
-            # Try HuggingFace as fallback
-            if self.huggingface_service:
-                logger.info("Falling back to HuggingFace due to OpenAI error")
-                return self._generate_huggingface_response(user_query, context, language)
-            else:
-                return {
-                    "success": False,
-                    "response": self._get_fallback_response(user_query, language),
-                    "confidence": 0.3,
-                    "model_used": "fallback_text"
-                }
-
-    def _generate_huggingface_response(
-        self,
-        user_query: str,
-        context: str,
-        language: str = "en"
-    ) -> Dict:
-        """Generate response using HuggingFace local models"""
-        try:
-            logger.info("Using HuggingFace multilingual model for response generation")
-
-            # Use the HuggingFace service
-            hf_result = self.huggingface_service.generate_response(
-                query=user_query,
+            # Use Gemini service for response generation
+            result = self.gemini_service.generate_response(
+                user_query=user_query,
                 context=context,
-                language=language
+                industry_context=industry_context,
+                language=language,
+                session_id=session_id
             )
 
-            if hf_result.get("success"):
-                # Calculate confidence based on response quality
-                confidence = self._calculate_response_confidence(hf_result.get("response", ""), context)
-
-                return {
-                    "success": True,
-                    "response": hf_result.get("response", ""),
-                    "confidence": confidence,
-                    "model_used": hf_result.get("model", "huggingface-local"),
-                    "cost": hf_result.get("cost", "FREE")
-                }
-            else:
-                return {
-                    "success": False,
-                    "response": self._get_fallback_response(user_query, language),
-                    "confidence": 0.3,
-                    "model_used": "fallback_text",
-                    "error": hf_result.get("error", "HuggingFace generation failed")
-                }
+            logger.info(f"Gemini Pro response generated successfully: {result.get('success')}")
+            return result
 
         except Exception as e:
-            logger.error(f"Error generating HuggingFace response: {e}")
+            logger.error(f"Error generating Gemini response: {e}")
             return {
                 "success": False,
-                "response": self._get_fallback_response(user_query, language),
-                "confidence": 0.3,
-                "model_used": "fallback_text",
+                "response": f"Error generating response with Gemini Pro: {str(e)}",
+                "confidence": 0.0,
+                "model_used": "gemini-pro",
                 "error": str(e)
             }
+
+    # Removed HuggingFace fallback - using Google Gemini Pro exclusively
     
     def _build_system_prompt(self, industry_context: str = None, language: str = "en") -> str:
         """Build system prompt for ReckonSales chatbot"""
