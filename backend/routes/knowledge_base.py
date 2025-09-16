@@ -347,59 +347,47 @@ async def get_document_chunks(
 
 @router.post("/search", response_model=DocumentSearchResponse)
 async def search_documents(search_request: DocumentSearchRequest, db: Session = Depends(get_db)):
-    """Search documents and chunks (basic text search for now, will be enhanced with vector search)"""
+    """Search documents and chunks using semantic vector search"""
     try:
         start_time = time.time()
-        
-        # Build query for chunks with document info
-        query = db.query(DocumentChunk, Document).join(Document)
-        
-        # Apply filters
-        if search_request.document_types:
-            doc_types = [dt.value for dt in search_request.document_types]
-            query = query.filter(Document.document_type.in_(doc_types))
-        
-        if search_request.industry_types:
-            industry_types = [it.value for it in search_request.industry_types]
-            query = query.filter(Document.industry_type.in_(industry_types))
-        
-        if search_request.language:
-            query = query.filter(Document.language == search_request.language.value)
-        
-        # Text search in chunk content
-        search_terms = search_request.query.lower().split()
-        for term in search_terms:
-            query = query.filter(DocumentChunk.chunk_text.contains(term))
-        
-        # Apply confidence filter
-        if search_request.min_confidence:
-            query = query.filter(DocumentChunk.confidence_score >= search_request.min_confidence)
-        
-        # Order by confidence score and limit results
-        results = query.order_by(desc(DocumentChunk.confidence_score)).limit(search_request.limit).all()
-        
-        # Format results
+
+        # Use semantic search with vector embeddings
+        document_types = [dt.value for dt in search_request.document_types] if search_request.document_types else None
+        industry_types = [it.value for it in search_request.industry_types] if search_request.industry_types else None
+        min_confidence = search_request.min_confidence or 0.0
+
+        # Perform semantic search using VectorSearchService
+        vector_results = vector_search_service.semantic_search(
+            query=search_request.query,
+            top_k=search_request.limit,
+            document_types=document_types,
+            industry_types=industry_types,
+            min_confidence=min_confidence
+        )
+
+        # Convert vector search results to API response format
         search_results = []
-        for chunk, document in results:
-            # Calculate a simple relevance score (will be replaced with vector similarity)
-            confidence_score = chunk.confidence_score or 0.5
-            
-            search_result = SearchResult(
-                chunk_id=chunk.id,
-                document_id=document.id,
-                document_title=document.title,
-                chunk_text=chunk.chunk_text,
-                chunk_index=chunk.chunk_index,
-                section_title=chunk.section_title,
-                confidence_score=confidence_score,
-                keywords=chunk.keywords,
-                document_type=document.document_type,
-                industry_type=document.industry_type
-            )
-            search_results.append(search_result)
-        
+        for result in vector_results:
+            # Get document info for each result
+            document = db.query(Document).filter(Document.id == result["document_id"]).first()
+
+            if document:
+                search_result = SearchResult(
+                    chunk_id=result["chunk_id"],
+                    document_id=result["document_id"],
+                    document_title=document.title,
+                    chunk_text=result["chunk_text"],
+                    chunk_index=result.get("chunk_index", 0),
+                    section_title=result.get("section_title"),
+                    confidence_score=result["similarity_score"],  # Use similarity score as confidence
+                    keywords=result.get("keywords"),
+                    document_type=document.document_type,
+                    industry_type=document.industry_type
+                )
+                search_results.append(search_result)
+
         search_time = int((time.time() - start_time) * 1000)
-        
+
         return DocumentSearchResponse(
             success=True,
             message=f"Found {len(search_results)} relevant chunks",
@@ -408,8 +396,9 @@ async def search_documents(search_request: DocumentSearchRequest, db: Session = 
             total_results=len(search_results),
             search_time_ms=search_time
         )
-    
+
     except Exception as e:
+        logger.error(f"Error in semantic search: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error searching documents: {str(e)}"
