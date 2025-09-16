@@ -13,13 +13,21 @@ from config.database import get_db
 from models.knowledge_base import Document, DocumentChunk, KnowledgeBaseQuery
 from models.user import User
 from models.chat import ChatSession, ChatMessage
+from services.document_processor import DocumentProcessor
+from services.vector_search import VectorSearchService
 from pydantic import BaseModel
+import time
+from loguru import logger
 
 router = APIRouter(
     prefix="/api/admin",
     tags=["admin"],
     responses={404: {"description": "Not found"}},
 )
+
+# Initialize services
+document_processor = DocumentProcessor()
+vector_search_service = VectorSearchService()
 
 # Response Models
 class DashboardStats(BaseModel):
@@ -247,9 +255,13 @@ async def get_knowledge_base_entries(
 
 @router.post("/knowledge-base", response_model=Dict[str, Any])
 async def create_knowledge_base_entry(entry: KnowledgeBaseCreate, db: Session = Depends(get_db)):
-    """Create a new knowledge base entry"""
+    """Create a new knowledge base entry with full processing pipeline"""
     try:
-        document = Document(
+        start_time = time.time()
+
+        # Use document processor to save document and create chunks
+        document, chunks, processing_time = document_processor.save_document_with_chunks(
+            db=db,
             title=entry.title,
             content=entry.content,
             document_type=entry.document_type,
@@ -257,18 +269,28 @@ async def create_knowledge_base_entry(entry: KnowledgeBaseCreate, db: Session = 
             language=entry.language
         )
 
-        db.add(document)
-        db.commit()
-        db.refresh(document)
+        # Create embeddings for the chunks and store in Pinecone
+        embeddings_created = 0
+        try:
+            embeddings_created = vector_search_service.store_chunk_embeddings(db, chunks)
+            logger.info(f"Admin: Created {embeddings_created} embeddings for document '{document.title}'")
+        except Exception as e:
+            logger.warning(f"Admin: Failed to create embeddings: {e}")
+
+        total_time = int((time.time() - start_time) * 1000)
 
         return {
             "id": document.id,
-            "message": "Knowledge base entry created successfully",
-            "status": "success"
+            "message": f"Knowledge base entry created successfully with {len(chunks)} chunks and {embeddings_created} embeddings",
+            "status": "success",
+            "chunks_created": len(chunks),
+            "embeddings_created": embeddings_created,
+            "processing_time_ms": total_time
         }
 
     except Exception as e:
         db.rollback()
+        logger.error(f"Admin: Error creating knowledge base entry: {e}")
         raise HTTPException(status_code=500, detail=f"Error creating knowledge base entry: {str(e)}")
 
 @router.put("/knowledge-base/{entry_id}", response_model=Dict[str, Any])
@@ -277,11 +299,14 @@ async def update_knowledge_base_entry(
     entry_update: KnowledgeBaseUpdate,
     db: Session = Depends(get_db)
 ):
-    """Update a knowledge base entry"""
+    """Update a knowledge base entry and regenerate embeddings if content changed"""
     try:
         document = db.query(Document).filter(Document.id == entry_id).first()
         if not document:
             raise HTTPException(status_code=404, detail="Knowledge base entry not found")
+
+        # Check if content is being updated (need to regenerate embeddings)
+        content_changed = entry_update.content is not None and entry_update.content != document.content
 
         # Update fields if provided
         if entry_update.title is not None:
@@ -298,20 +323,64 @@ async def update_knowledge_base_entry(
             document.is_active = entry_update.is_active
 
         document.updated_at = func.now()
-
         db.commit()
         db.refresh(document)
 
+        # If content changed, regenerate chunks and embeddings
+        embeddings_updated = 0
+        chunks_created = 0
+        if content_changed:
+            try:
+                # Delete existing chunks and embeddings
+                existing_chunks = db.query(DocumentChunk).filter(DocumentChunk.document_id == entry_id).all()
+                for chunk in existing_chunks:
+                    db.delete(chunk)
+                db.commit()
+
+                # Recreate chunks using document processor
+                chunks_data = document_processor.chunk_document(document.content)
+
+                # Create new chunk objects
+                chunk_objects = []
+                for chunk_data in chunks_data:
+                    chunk = DocumentChunk(
+                        document_id=document.id,
+                        chunk_text=chunk_data['text'],
+                        chunk_index=chunk_data['index'],
+                        chunk_size=chunk_data['size'],
+                        overlap_with_previous=chunk_data['overlap_with_previous'],
+                        keywords=chunk_data.get('keywords'),
+                        section_title=chunk_data.get('section_title'),
+                        confidence_score=chunk_data.get('confidence_score')
+                    )
+                    chunk_objects.append(chunk)
+
+                db.add_all(chunk_objects)
+                db.commit()
+                chunks_created = len(chunk_objects)
+
+                # Generate new embeddings
+                embeddings_updated = vector_search_service.store_chunk_embeddings(db, chunk_objects)
+                logger.info(f"Admin: Updated {embeddings_updated} embeddings for document '{document.title}'")
+
+            except Exception as e:
+                logger.warning(f"Admin: Failed to regenerate embeddings during update: {e}")
+
         return {
             "id": document.id,
-            "message": "Knowledge base entry updated successfully",
-            "status": "success"
+            "message": f"Knowledge base entry updated successfully" +
+                      (f" with {chunks_created} new chunks and {embeddings_updated} embeddings" if content_changed else ""),
+            "status": "success",
+            "content_changed": content_changed,
+            "chunks_updated": chunks_created if content_changed else 0,
+            "embeddings_updated": embeddings_updated if content_changed else 0
         }
 
     except HTTPException:
         raise
     except Exception as e:
         db.rollback()
+        logger.error(f"Admin: Error updating knowledge base entry: {e}")
         raise HTTPException(status_code=500, detail=f"Error updating knowledge base entry: {str(e)}")
 
 @router.delete("/knowledge-base/{entry_id}", response_model=Dict[str, Any])
