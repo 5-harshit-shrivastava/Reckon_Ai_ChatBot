@@ -21,8 +21,6 @@ import {
   Menu as MenuIcon,
   Dashboard as DashboardIcon,
   Storage as DataIcon,
-  Analytics as AnalyticsIcon,
-  Settings as SettingsIcon,
   AccountCircle,
   Logout,
   Notifications,
@@ -46,8 +44,6 @@ interface NavigationItem {
 const navigationItems: NavigationItem[] = [
   { label: 'Dashboard', path: '/', icon: <DashboardIcon /> },
   { label: 'Data Management', path: '/data', icon: <DataIcon /> },
-  { label: 'Analytics', path: '/analytics', icon: <AnalyticsIcon /> },
-  { label: 'Settings', path: '/settings', icon: <SettingsIcon /> },
 ];
 
 export const AdminLayout: React.FC<AdminLayoutProps> = ({ children, title = "Admin Dashboard" }) => {

@@ -46,11 +46,29 @@ logs/
 .env.local
 .env.production
 
-# Node.js (if any)
+# Node.js
 node_modules/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+
+# Production Build
+/frontend/user/build/
+/frontend/admin/build/
+
+# Development Files
+*.test.*
+*.spec.*
+__tests__/
+coverage/
+
+# Development Documentation
+Figma Design/
+ReckonUnderstandings/
+tester/
+*API_TESTING_GUIDE.md
+*RAG_IMPLEMENTATION.md
+*CONNECTION_SETUP.md
 
 # OS
 .DS_Store

@@ -21,47 +21,19 @@ import {
   InputLabel,
   Select,
   MenuItem,
-  Tabs,
-  Tab,
-  Paper,
   CircularProgress,
 } from '@mui/material';
 import {
   Add as AddIcon,
   Edit as EditIcon,
   Delete as DeleteIcon,
-  Upload as UploadIcon,
-  Download as DownloadIcon,
   Refresh as RefreshIcon,
 } from '@mui/icons-material';
 import { AdminLayout } from '../components/AdminLayout';
 import { ReckonCard, colors } from '../shared';
 import AdminApiService, { KnowledgeBaseEntry, KnowledgeBaseCreate, KnowledgeBaseUpdate } from '../services/adminApi';
 
-interface TabPanelProps {
-  children?: React.ReactNode;
-  index: number;
-  value: number;
-}
-
-function TabPanel(props: TabPanelProps) {
-  const { children, value, index, ...other } = props;
-
-  return (
-    <div
-      role="tabpanel"
-      hidden={value !== index}
-      id={`simple-tabpanel-${index}`}
-      aria-labelledby={`simple-tab-${index}`}
-      {...other}
-    >
-      {value === index && <Box sx={{ py: 3 }}>{children}</Box>}
-    </div>
-  );
-}
-
 const DataManagementPage: React.FC = () => {
-  const [tabValue, setTabValue] = useState(0);
   const [openDialog, setOpenDialog] = useState(false);
   const [dialogType, setDialogType] = useState<'add' | 'edit'>('add');
   const [selectedItem, setSelectedItem] = useState<KnowledgeBaseEntry | null>(null);
@@ -75,6 +47,7 @@ const DataManagementPage: React.FC = () => {
     industry_type: '',
     language: 'en'
   });
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     loadKnowledgeBaseEntries();
@@ -94,22 +67,39 @@ const DataManagementPage: React.FC = () => {
     }
   };
 
-  const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
-    setTabValue(newValue);
-  };
 
-  const handleOpenDialog = (type: 'add' | 'edit', item?: KnowledgeBaseEntry) => {
+  const handleOpenDialog = async (type: 'add' | 'edit', item?: KnowledgeBaseEntry) => {
     setDialogType(type);
     setSelectedItem(item || null);
-    if (item) {
-      setFormData({
-        title: item.title,
-        content: '', // We'll need to fetch full content if editing
-        document_type: item.document_type,
-        industry_type: item.industry_type || '',
-        language: item.language
-      });
+
+    if (item && type === 'edit') {
+      // For edit, fetch the full content from the API
+      try {
+        setIsSubmitting(true);
+        const fullEntry = await AdminApiService.getKnowledgeBaseEntry(item.id);
+        setFormData({
+          title: fullEntry.title,
+          content: fullEntry.content,
+          document_type: fullEntry.document_type,
+          industry_type: fullEntry.industry_type || '',
+          language: fullEntry.language
+        });
+      } catch (err) {
+        const errorMessage = AdminApiService.handleApiError(err);
+        setError(errorMessage);
+        // Fallback to partial data if API fails
+        setFormData({
+          title: item.title,
+          content: '',
+          document_type: item.document_type,
+          industry_type: item.industry_type || '',
+          language: item.language
+        });
+      } finally {
+        setIsSubmitting(false);
+      }
     } else {
+      // For add, use empty form
       setFormData({
         title: '',
         content: '',
@@ -124,6 +114,7 @@ const DataManagementPage: React.FC = () => {
   const handleCloseDialog = () => {
     setOpenDialog(false);
     setSelectedItem(null);
+    setIsSubmitting(false);
     setFormData({
       title: '',
       content: '',
@@ -134,7 +125,12 @@ const DataManagementPage: React.FC = () => {
   };
 
   const handleSaveEntry = async () => {
+    if (isSubmitting) return; // Prevent duplicate submissions
+
     try {
+      setIsSubmitting(true);
+      setError(null);
+
       if (dialogType === 'add') {
         await AdminApiService.createKnowledgeBaseEntry({
           title: formData.title,
@@ -157,6 +153,8 @@ const DataManagementPage: React.FC = () => {
     } catch (err) {
       const errorMessage = AdminApiService.handleApiError(err);
       setError(errorMessage);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -216,49 +214,12 @@ const DataManagementPage: React.FC = () => {
             </Typography>
           </ReckonCard>
         </Grid>
-        <Grid size={{xs: 12, sm: 6, md: 3}}>
-          <ReckonCard hover={false}>
-            <Typography variant="h3" component="div" sx={{ fontWeight: 700, mb: 0.5 }}>
-              8,945
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              Training Examples
-            </Typography>
-          </ReckonCard>
-        </Grid>
-        <Grid size={{xs: 12, sm: 6, md: 3}}>
-          <ReckonCard hover={false}>
-            <Typography variant="h3" component="div" sx={{ fontWeight: 700, mb: 0.5 }}>
-              94.2%
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              Data Quality Score
-            </Typography>
-          </ReckonCard>
-        </Grid>
-        <Grid size={{xs: 12, sm: 6, md: 3}}>
-          <ReckonCard hover={false}>
-            <Typography variant="h3" component="div" sx={{ fontWeight: 700, mb: 0.5 }}>
-              2.3k
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              Pending Reviews
-            </Typography>
-          </ReckonCard>
-        </Grid>
       </Grid>
 
       {/* Main Content */}
       <ReckonCard hover={false}>
-        <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
-          <Tabs value={tabValue} onChange={handleTabChange}>
-            <Tab label="Knowledge Base" />
-            <Tab label="Training Data" />
-            <Tab label="Bulk Operations" />
-          </Tabs>
-        </Box>
 
-        <TabPanel value={tabValue} index={0}>
+        <Box sx={{ p: 3 }}>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
             <Typography variant="h6" sx={{ fontWeight: 600 }}>
               Knowledge Base Entries
@@ -365,68 +326,41 @@ const DataManagementPage: React.FC = () => {
               </TableBody>
             </Table>
           </TableContainer>
-        </TabPanel>
+        </Box>
 
-        <TabPanel value={tabValue} index={1}>
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-            <Typography variant="h6" sx={{ fontWeight: 600 }}>
-              Training Data
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              Training data will be implemented in a future update. For now, use Knowledge Base entries.
-            </Typography>
-          </Box>
-        </TabPanel>
-
-        <TabPanel value={tabValue} index={2}>
-          <Typography variant="h6" sx={{ fontWeight: 600, mb: 3 }}>
-            Bulk Operations
-          </Typography>
-          <Grid container spacing={3}>
-            <Grid size={{xs: 12, md: 6}}>
-              <Paper sx={{ p: 3, border: `1px solid ${colors.divider}` }}>
-                <Typography variant="subtitle1" sx={{ mb: 2, fontWeight: 600 }}>
-                  Import Data
-                </Typography>
-                <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                  Upload CSV or JSON files to bulk import knowledge base entries or training data.
-                </Typography>
-                <Button variant="outlined" startIcon={<UploadIcon />} fullWidth>
-                  Choose Files
-                </Button>
-              </Paper>
-            </Grid>
-            <Grid size={{xs: 12, md: 6}}>
-              <Paper sx={{ p: 3, border: `1px solid ${colors.divider}` }}>
-                <Typography variant="subtitle1" sx={{ mb: 2, fontWeight: 600 }}>
-                  Export Data
-                </Typography>
-                <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                  Download your knowledge base and training data in various formats.
-                </Typography>
-                <Button variant="outlined" startIcon={<DownloadIcon />} fullWidth>
-                  Export Data
-                </Button>
-              </Paper>
-            </Grid>
-          </Grid>
-        </TabPanel>
       </ReckonCard>
 
       {/* Add/Edit Dialog */}
-      <Dialog open={openDialog} onClose={handleCloseDialog} maxWidth="md" fullWidth>
+      <Dialog
+        open={openDialog}
+        onClose={handleCloseDialog}
+        maxWidth="md"
+        fullWidth
+        disableRestoreFocus
+      >
         <DialogTitle>
           {dialogType === 'add' ? 'Add New Entry' : 'Edit Entry'}
         </DialogTitle>
         <DialogContent>
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 1 }}>
-            <TextField
-              label="Title"
-              fullWidth
-              value={formData.title}
-              onChange={(e) => setFormData({...formData, title: e.target.value})}
-              required
-            />
+          {error && (
+            <Typography color="error" sx={{ mb: 2 }}>
+              {error}
+            </Typography>
+          )}
+          {isSubmitting && dialogType === 'edit' ? (
+            <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', py: 4 }}>
+              <CircularProgress size={32} />
+              <Typography sx={{ ml: 2 }}>Loading content...</Typography>
+            </Box>
+          ) : (
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 1 }}>
+              <TextField
+                label="Title"
+                fullWidth
+                value={formData.title}
+                onChange={(e) => setFormData({...formData, title: e.target.value})}
+                required
+              />
             <FormControl fullWidth>
               <InputLabel>Document Type</InputLabel>
               <Select
@@ -481,16 +415,24 @@ const DataManagementPage: React.FC = () => {
                 <MenuItem value="es">Spanish</MenuItem>
               </Select>
             </FormControl>
-          </Box>
+            </Box>
+          )}
         </DialogContent>
         <DialogActions>
           <Button onClick={handleCloseDialog}>Cancel</Button>
           <Button
             variant="contained"
             onClick={handleSaveEntry}
-            disabled={!formData.title || !formData.content || !formData.document_type}
+            disabled={!formData.title || !formData.content || !formData.document_type || isSubmitting}
           >
-            {dialogType === 'add' ? 'Add' : 'Save'}
+            {isSubmitting ? (
+              <>
+                <CircularProgress size={16} sx={{ mr: 1 }} />
+                {dialogType === 'add' ? 'Adding...' : 'Saving...'}
+              </>
+            ) : (
+              dialogType === 'add' ? 'Add' : 'Save'
+            )}
           </Button>
         </DialogActions>
       </Dialog>

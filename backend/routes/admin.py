@@ -166,8 +166,9 @@ async def get_top_queries(limit: int = 5, db: Session = Depends(get_db)):
         top_queries = []
 
         # Get recent chat messages and count similar patterns
-        recent_messages = db.query(ChatMessage.user_message).filter(
-            ChatMessage.user_message.isnot(None)
+        recent_messages = db.query(ChatMessage.message_text).filter(
+            ChatMessage.message_text.isnot(None),
+            ChatMessage.message_type == "user"
         ).order_by(desc(ChatMessage.created_at)).limit(100).all()
 
         # Simplified query categorization
@@ -385,13 +386,22 @@ async def update_knowledge_base_entry(
 
 @router.delete("/knowledge-base/{entry_id}", response_model=Dict[str, Any])
 async def delete_knowledge_base_entry(entry_id: int, db: Session = Depends(get_db)):
-    """Delete a knowledge base entry (soft delete)"""
+    """Delete a knowledge base entry (soft delete + vector cleanup)"""
     try:
         document = db.query(Document).filter(Document.id == entry_id).first()
         if not document:
             raise HTTPException(status_code=404, detail="Knowledge base entry not found")
 
-        # Soft delete
+        # Delete vectors from Pinecone first
+        vectors_deleted = 0
+        try:
+            vectors_deleted = vector_search_service.delete_document_embeddings(db, entry_id)
+            logger.info(f"Deleted {vectors_deleted} vectors from Pinecone for document {entry_id}")
+        except Exception as e:
+            logger.warning(f"Failed to delete vectors from Pinecone: {e}")
+            # Continue with soft delete even if vector deletion fails
+
+        # Soft delete the document
         document.is_active = False
         document.updated_at = func.now()
 
@@ -399,14 +409,16 @@ async def delete_knowledge_base_entry(entry_id: int, db: Session = Depends(get_d
 
         return {
             "id": entry_id,
-            "message": "Knowledge base entry deleted successfully",
-            "status": "success"
+            "message": f"Knowledge base entry deleted successfully. Removed {vectors_deleted} vectors from search index.",
+            "status": "success",
+            "vectors_deleted": vectors_deleted
         }
 
     except HTTPException:
         raise
     except Exception as e:
         db.rollback()
+        logger.error(f"Error deleting knowledge base entry: {e}")
         raise HTTPException(status_code=500, detail=f"Error deleting knowledge base entry: {str(e)}")
 
 @router.get("/knowledge-base/{entry_id}", response_model=Dict[str, Any])

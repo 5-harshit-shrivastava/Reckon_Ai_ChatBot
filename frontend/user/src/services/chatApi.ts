@@ -5,7 +5,7 @@ const API_BASE_URL = 'http://localhost:8000';
 // Create axios instance with default config
 const api = axios.create({
   baseURL: API_BASE_URL,
-  timeout: 10000,
+  timeout: 30000, // Increased timeout for chat responses
   headers: {
     'Content-Type': 'application/json',
   },
@@ -64,7 +64,7 @@ export class ChatApiService {
   // Send a message to the chatbot
   static async sendMessage(request: SendMessageRequest): Promise<SendMessageResponse> {
     try {
-      const response = await api.post('/api/chat/send', request);
+      const response = await api.post('/api/chat/messages/send', request);
       return response.data;
     } catch (error) {
       console.error('Error sending message:', error);
@@ -75,8 +75,8 @@ export class ChatApiService {
   // Create a new chat session
   static async createSession(request: CreateSessionRequest): Promise<ChatSession> {
     try {
-      const response = await api.post('/api/chat/sessions', request);
-      return response.data;
+      const response = await api.post('/api/chat/sessions/', request);
+      return response.data.data.session;
     } catch (error) {
       console.error('Error creating session:', error);
       throw error;
@@ -86,7 +86,7 @@ export class ChatApiService {
   // Get user's chat sessions
   static async getSessions(userId: number): Promise<ChatSession[]> {
     try {
-      const response = await api.get(`/api/chat/sessions?user_id=${userId}`);
+      const response = await api.get(`/api/chat/sessions/?user_id=${userId}`);
       return response.data;
     } catch (error) {
       console.error('Error fetching sessions:', error);

@@ -586,3 +586,80 @@ class VectorSearchService:
         except Exception as e:
             logger.warning(f"Error getting document language: {e}")
             return "en"
+
+    def delete_document_embeddings(self, db: Session, document_id: int) -> int:
+        """
+        Delete all vector embeddings for a specific document from Pinecone
+
+        Args:
+            db: Database session
+            document_id: ID of the document to delete embeddings for
+
+        Returns:
+            Number of vectors deleted
+        """
+        try:
+            if not self.pinecone_index:
+                logger.error("Pinecone index not available for deletion")
+                return 0
+
+            # Get all chunks for this document
+            chunks = db.query(DocumentChunk).filter(
+                DocumentChunk.document_id == document_id
+            ).all()
+
+            if not chunks:
+                logger.info(f"No chunks found for document {document_id}")
+                return 0
+
+            # Prepare vector IDs to delete
+            vector_ids = []
+            for chunk in chunks:
+                vector_id = f"doc_{document_id}_chunk_{chunk.id}"
+                vector_ids.append(vector_id)
+
+            # Delete vectors from Pinecone in batches
+            batch_size = 100
+            total_deleted = 0
+
+            for i in range(0, len(vector_ids), batch_size):
+                batch_ids = vector_ids[i:i + batch_size]
+                try:
+                    self.pinecone_index.delete(ids=batch_ids)
+                    total_deleted += len(batch_ids)
+                    logger.info(f"Deleted batch of {len(batch_ids)} vectors from Pinecone")
+                except Exception as e:
+                    logger.error(f"Error deleting batch from Pinecone: {e}")
+
+            logger.info(f"Successfully deleted {total_deleted} vectors for document {document_id}")
+            return total_deleted
+
+        except Exception as e:
+            logger.error(f"Error deleting document embeddings: {e}")
+            return 0
+
+    def delete_chunk_embedding(self, chunk_id: int, document_id: int) -> bool:
+        """
+        Delete a specific chunk's embedding from Pinecone
+
+        Args:
+            chunk_id: ID of the chunk
+            document_id: ID of the parent document
+
+        Returns:
+            True if deletion was successful, False otherwise
+        """
+        try:
+            if not self.pinecone_index:
+                logger.error("Pinecone index not available for deletion")
+                return False
+
+            vector_id = f"doc_{document_id}_chunk_{chunk_id}"
+
+            self.pinecone_index.delete(ids=[vector_id])
+            logger.info(f"Successfully deleted vector {vector_id} from Pinecone")
+            return True
+
+        except Exception as e:
+            logger.error(f"Error deleting chunk embedding: {e}")
+            return False
