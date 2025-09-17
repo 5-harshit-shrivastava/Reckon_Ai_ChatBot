@@ -412,7 +412,6 @@ const DataManagementPage: React.FC = () => {
               >
                 <MenuItem value="en">English</MenuItem>
                 <MenuItem value="hi">Hindi</MenuItem>
-                <MenuItem value="es">Spanish</MenuItem>
               </Select>
             </FormControl>
             </Box>

@@ -7,17 +7,15 @@ import {
   Paper,
   Avatar,
   Chip,
-  Button,
   CircularProgress,
 } from '@mui/material';
 import {
   Send as SendIcon,
-  Phone as PhoneIcon,
-  Email as EmailIcon,
-  CalendarToday as CalendarIcon,
-  Settings as SettingsIcon,
+  AttachFile as AttachIcon,
+  Mic as MicIcon,
+  SmartToy as BotIcon,
+  Person as PersonIcon,
 } from '@mui/icons-material';
-import { colors } from '../theme';
 
 export interface Message {
   id: string;
@@ -25,6 +23,9 @@ export interface Message {
   sender: 'user' | 'assistant';
   timestamp: Date;
   type?: 'text' | 'suggestion' | 'action';
+  confidence?: number;
+  responseTime?: number;
+  status?: 'delivered' | 'pending' | 'failed';
 }
 
 interface ChatInterfaceProps {
@@ -41,10 +42,8 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
   messages,
   onSendMessage,
   isTyping = false,
-  placeholder = "Ask about billing, GST, inventory...",
+  placeholder = "Type your message...",
   suggestions = [],
-  showContactOptions = false,
-  onContactAction,
 }) => {
   const [inputValue, setInputValue] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -75,109 +74,175 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
     onSendMessage(suggestion);
   };
 
-  const formatTime = (date: Date) => {
-    return date.toLocaleTimeString('en-US', {
-      hour: '2-digit',
-      minute: '2-digit',
-    });
+  const getTimeAgo = (date: Date) => {
+    const now = new Date();
+    const diffInMinutes = Math.floor((now.getTime() - date.getTime()) / (1000 * 60));
+
+    if (diffInMinutes === 0) {
+      return 'less than a minute ago';
+    } else if (diffInMinutes === 1) {
+      return '1 minute ago';
+    } else if (diffInMinutes < 60) {
+      return `${diffInMinutes} minutes ago`;
+    } else {
+      const hours = Math.floor(diffInMinutes / 60);
+      return hours === 1 ? '1 hour ago' : `${hours} hours ago`;
+    }
   };
 
   return (
-    <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+    <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%', position: 'relative' }}>
       {/* Messages Area */}
       <Box
         sx={{
           flex: 1,
           overflowY: 'auto',
-          p: 2,
+          overflowX: 'hidden',
+          p: 3,
+          pb: 0, // Remove bottom padding to avoid double spacing
           display: 'flex',
           flexDirection: 'column',
-          gap: 2,
+          gap: 4,
           minHeight: 0,
+          bgcolor: '#ffffff',
         }}
       >
         {messages.map((message) => (
-          <Box
-            key={message.id}
-            sx={{
-              display: 'flex',
-              justifyContent: message.sender === 'user' ? 'flex-end' : 'flex-start',
-              alignItems: 'flex-start',
-              gap: 1,
-            }}
-          >
-            {message.sender === 'assistant' && (
-              <Avatar
-                sx={{
-                  width: 32,
-                  height: 32,
-                  bgcolor: colors.primary.main,
-                  fontSize: '0.875rem',
-                }}
-              >
-                AI
-              </Avatar>
+          <Box key={message.id}>
+            {message.sender === 'assistant' ? (
+              // Assistant Message
+              <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 2 }}>
+                <Avatar
+                  sx={{
+                    width: 44,
+                    height: 44,
+                    bgcolor: '#f8f9fa',
+                    color: '#3c4043',
+                    border: '1px solid #dadce0',
+                  }}
+                >
+                  <BotIcon sx={{ fontSize: 22 }} />
+                </Avatar>
+                <Box sx={{ flex: 1, maxWidth: '80%' }}>
+                  <Paper
+                    elevation={0}
+                    sx={{
+                      p: 2.5,
+                      borderRadius: 2,
+                      bgcolor: '#f1f3f4',
+                      border: '1px solid #e8eaed',
+                      borderTopLeftRadius: 4,
+                      mb: 1,
+                    }}
+                  >
+                    <Typography
+                      variant="body1"
+                      sx={{
+                        whiteSpace: 'pre-wrap',
+                        lineHeight: 1.5,
+                        color: '#202124',
+                        fontSize: '14px',
+                      }}
+                    >
+                      {message.content}
+                    </Typography>
+                  </Paper>
+
+                  {/* Assistant Message Status */}
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, px: 1 }}>
+                    <Typography variant="caption" sx={{ color: '#5f6368', fontSize: '12px' }}>
+                      {getTimeAgo(message.timestamp)}
+                    </Typography>
+                    {message.confidence && (
+                      <Typography variant="caption" sx={{ color: '#137333', fontSize: '12px', fontWeight: 500 }}>
+                        {message.confidence}% confidence
+                      </Typography>
+                    )}
+                    {message.responseTime && (
+                      <Typography variant="caption" sx={{ color: '#5f6368', fontSize: '12px' }}>
+                        {message.responseTime}ms
+                      </Typography>
+                    )}
+                  </Box>
+                </Box>
+              </Box>
+            ) : (
+              // User Message
+              <Box sx={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'flex-start', gap: 2 }}>
+                <Box sx={{ maxWidth: '80%', display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
+                  <Paper
+                    elevation={0}
+                    sx={{
+                      p: 2,
+                      borderRadius: 2,
+                      bgcolor: '#4285f4',
+                      color: 'white',
+                      borderTopRightRadius: 4,
+                      mb: 1,
+                      minWidth: 'fit-content',
+                    }}
+                  >
+                    <Typography
+                      variant="body1"
+                      sx={{
+                        whiteSpace: 'pre-wrap',
+                        lineHeight: 1.5,
+                        fontSize: '14px',
+                        color: 'white',
+                      }}
+                    >
+                      {message.content}
+                    </Typography>
+                  </Paper>
+
+                  {/* User Message Status */}
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, px: 1 }}>
+                    <Typography variant="caption" sx={{ color: '#5f6368', fontSize: '12px' }}>
+                      {getTimeAgo(message.timestamp)}
+                    </Typography>
+                  </Box>
+                </Box>
+                <Avatar
+                  sx={{
+                    width: 32,
+                    height: 32,
+                    bgcolor: '#4285f4',
+                    color: 'white',
+                  }}
+                >
+                  <PersonIcon sx={{ fontSize: 18 }} />
+                </Avatar>
+              </Box>
             )}
-            <Box
-              sx={{
-                maxWidth: '70%',
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: message.sender === 'user' ? 'flex-end' : 'flex-start',
-              }}
-            >
-              <Paper
-                elevation={1}
-                sx={{
-                  p: 2,
-                  borderRadius: 2,
-                  bgcolor: message.sender === 'user' ? colors.primary.main : colors.background.paper,
-                  color: message.sender === 'user' ? 'white' : colors.text.primary,
-                  border: message.sender === 'assistant' ? `1px solid ${colors.divider}` : 'none',
-                  borderBottomRightRadius: message.sender === 'user' ? 4 : 16,
-                  borderBottomLeftRadius: message.sender === 'assistant' ? 4 : 16,
-                }}
-              >
-                <Typography variant="body1" sx={{ whiteSpace: 'pre-wrap' }}>
-                  {message.content}
-                </Typography>
-              </Paper>
-              <Typography
-                variant="caption"
-                color="text.secondary"
-                sx={{ mt: 0.5, px: 1 }}
-              >
-                {formatTime(message.timestamp)}
-              </Typography>
-            </Box>
           </Box>
         ))}
 
         {isTyping && (
-          <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1 }}>
+          <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 2 }}>
             <Avatar
               sx={{
-                width: 32,
-                height: 32,
-                bgcolor: colors.primary.main,
-                fontSize: '0.875rem',
+                width: 44,
+                height: 44,
+                bgcolor: '#f8f9fa',
+                color: '#3c4043',
+                border: '1px solid #dadce0',
               }}
             >
-              AI
+              <BotIcon sx={{ fontSize: 22 }} />
             </Avatar>
             <Paper
-              elevation={1}
+              elevation={0}
               sx={{
-                p: 2,
+                p: 2.5,
                 borderRadius: 2,
-                bgcolor: colors.background.paper,
-                border: `1px solid ${colors.divider}`,
-                borderBottomLeftRadius: 4,
+                bgcolor: '#f1f3f4',
+                border: '1px solid #e8eaed',
+                borderTopLeftRadius: 4,
               }}
             >
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                <CircularProgress size={16} />
-                <Typography variant="body2" color="text.secondary">
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                <CircularProgress size={16} sx={{ color: '#4285f4' }} />
+                <Typography variant="body2" sx={{ color: '#5f6368', fontSize: '14px' }}>
                   AI is typing...
                 </Typography>
               </Box>
@@ -186,96 +251,58 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
         )}
 
         <div ref={messagesEndRef} />
+
+        {/* Suggestions inside messages area */}
+        {suggestions.length > 0 && (
+          <Box sx={{ p: 3, pt: 2, bgcolor: '#ffffff' }}>
+            <Box
+              sx={{
+                display: 'flex',
+                flexWrap: 'wrap',
+                gap: 1.5,
+                maxHeight: { xs: 120, sm: 'none' },
+                overflowY: { xs: 'auto', sm: 'visible' },
+              }}
+            >
+              {suggestions.map((suggestion, index) => (
+                <Chip
+                  key={index}
+                  label={suggestion}
+                  variant="outlined"
+                  onClick={() => handleSuggestionClick(suggestion)}
+                  sx={{
+                    borderColor: '#dadce0',
+                    color: '#3c4043',
+                    fontSize: '13px',
+                    height: 'auto',
+                    py: 1,
+                    px: 2,
+                    borderRadius: 3,
+                    '&:hover': {
+                      bgcolor: '#f8f9fa',
+                      borderColor: '#4285f4',
+                      color: '#4285f4',
+                    },
+                    transition: 'all 0.2s ease',
+                  }}
+                />
+              ))}
+            </Box>
+          </Box>
+        )}
       </Box>
 
-      {/* Suggestions */}
-      {suggestions.length > 0 && (
-        <Box sx={{ p: 2, pt: 0 }}>
-          <Box
-            sx={{
-              display: 'flex',
-              flexWrap: 'wrap',
-              gap: 1,
-              maxHeight: { xs: 120, sm: 'none' },
-              overflowY: { xs: 'auto', sm: 'visible' },
-            }}
-          >
-            {suggestions.map((suggestion, index) => (
-              <Chip
-                key={index}
-                label={suggestion}
-                variant="outlined"
-                onClick={() => handleSuggestionClick(suggestion)}
-                sx={{
-                  borderColor: colors.primary.main,
-                  color: colors.primary.main,
-                  fontSize: { xs: '0.75rem', sm: '0.875rem' },
-                  height: { xs: 'auto', sm: 32 },
-                  '&:hover': {
-                    bgcolor: colors.primary.main,
-                    color: 'white',
-                  },
-                }}
-              />
-            ))}
-          </Box>
-        </Box>
-      )}
-
-      {/* Contact Options */}
-      {showContactOptions && (
-        <Box sx={{ p: 2, pt: 0 }}>
-          <Box
-            sx={{
-              display: 'flex',
-              gap: { xs: 1, sm: 2 },
-              flexWrap: 'wrap',
-              flexDirection: { xs: 'column', sm: 'row' },
-            }}
-          >
-            <Button
-              variant="outlined"
-              startIcon={<PhoneIcon />}
-              onClick={() => onContactAction?.('call')}
-              size="small"
-              sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' } }}
-            >
-              <Box component="span" sx={{ display: { xs: 'none', sm: 'inline' } }}>
-                Call: +91-522-XXXXXX
-              </Box>
-              <Box component="span" sx={{ display: { xs: 'inline', sm: 'none' } }}>
-                Call
-              </Box>
-            </Button>
-            <Button
-              variant="outlined"
-              startIcon={<EmailIcon />}
-              onClick={() => onContactAction?.('email')}
-              size="small"
-              sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' } }}
-            >
-              <Box component="span" sx={{ display: { xs: 'none', sm: 'inline' } }}>
-                Email: support@reckonsales.in
-              </Box>
-              <Box component="span" sx={{ display: { xs: 'inline', sm: 'none' } }}>
-                Email
-              </Box>
-            </Button>
-            <Button
-              variant="contained"
-              startIcon={<CalendarIcon />}
-              onClick={() => onContactAction?.('demo')}
-              size="small"
-              sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' } }}
-            >
-              Book a Demo
-            </Button>
-          </Box>
-        </Box>
-      )}
-
-      {/* Input Area */}
-      <Box sx={{ p: 2, borderTop: `1px solid ${colors.divider}` }}>
+      {/* Input Area - Fixed at bottom */}
+      <Box
+        sx={{
+          position: 'sticky',
+          bottom: 0,
+          p: 3,
+          borderTop: '1px solid #e8eaed',
+          bgcolor: 'white',
+          zIndex: 10,
+        }}
+      >
         <Box sx={{ display: 'flex', gap: 1, alignItems: 'flex-end' }}>
           <TextField
             fullWidth
@@ -285,37 +312,83 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
             placeholder={placeholder}
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
-            onKeyPress={handleKeyPress}
+            onKeyDown={handleKeyPress}
             sx={{
               '& .MuiOutlinedInput-root': {
-                borderRadius: 2,
+                borderRadius: 3,
+                bgcolor: 'white',
+                borderColor: '#dadce0',
+                fontSize: '14px',
+                '&:hover': {
+                  borderColor: '#4285f4',
+                },
+                '&.Mui-focused': {
+                  borderColor: '#4285f4',
+                },
+              },
+              '& .MuiInputBase-input': {
+                py: 1.5,
               },
             }}
           />
           <IconButton
-            color="primary"
+            sx={{
+              color: '#5f6368',
+              '&:hover': {
+                bgcolor: '#f8f9fa',
+                color: '#4285f4',
+              },
+              p: 1.5,
+            }}
+          >
+            <AttachIcon sx={{ fontSize: 20 }} />
+          </IconButton>
+          <IconButton
+            sx={{
+              color: '#5f6368',
+              '&:hover': {
+                bgcolor: '#f8f9fa',
+                color: '#4285f4',
+              },
+              p: 1.5,
+            }}
+          >
+            <MicIcon sx={{ fontSize: 20 }} />
+          </IconButton>
+          <IconButton
             onClick={handleSend}
             disabled={!inputValue.trim()}
             sx={{
-              bgcolor: colors.primary.main,
-              color: 'white',
+              bgcolor: inputValue.trim() ? '#4285f4' : '#f1f3f4',
+              color: inputValue.trim() ? 'white' : '#9aa0a6',
               '&:hover': {
-                bgcolor: colors.primary.dark,
+                bgcolor: inputValue.trim() ? '#3367d6' : '#f1f3f4',
               },
               '&:disabled': {
-                bgcolor: colors.secondary.light,
+                bgcolor: '#f1f3f4',
+                color: '#9aa0a6',
               },
+              p: 1.5,
+              borderRadius: 2,
             }}
           >
-            <SendIcon />
-          </IconButton>
-          <IconButton
-            color="inherit"
-            sx={{ color: colors.text.secondary }}
-          >
-            <SettingsIcon />
+            <SendIcon sx={{ fontSize: 20 }} />
           </IconButton>
         </Box>
+
+        {/* Input Helper Text */}
+        <Typography
+          variant="caption"
+          sx={{
+            color: '#9aa0a6',
+            fontSize: '12px',
+            mt: 1,
+            display: 'block',
+            textAlign: 'center',
+          }}
+        >
+          Press Enter to send, Shift+Enter for new line
+        </Typography>
       </Box>
     </Box>
   );

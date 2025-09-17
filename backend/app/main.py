@@ -24,12 +24,17 @@ app = FastAPI(
     version="1.0.0"
 )
 
-# Configure CORS
+# Configure CORS for production deployment
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Configure this properly for production
+    allow_origins=[
+        "https://reckon-rag-chatbot-user.vercel.app",
+        "https://reckon-rag-chatbot-admin.vercel.app",
+        "http://localhost:3000",
+        "http://localhost:3001"
+    ],
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["*"],
 )
 
@@ -63,10 +68,13 @@ app.include_router(chat_messages_router)
 app.include_router(knowledge_router)
 app.include_router(admin_router)
 
+# For Vercel deployment
+handler = app
+
 if __name__ == "__main__":
     import uvicorn
-    
+
     host = os.getenv("HOST", "0.0.0.0")
     port = int(os.getenv("PORT", 8000))
-    
+
     uvicorn.run(app, host=host, port=port)

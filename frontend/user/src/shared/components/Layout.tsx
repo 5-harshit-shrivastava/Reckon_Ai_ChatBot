@@ -158,7 +158,6 @@ export const Layout: React.FC<LayoutProps> = ({
                 >
                   <MenuItem onClick={handleMenuClose}>English</MenuItem>
                   <MenuItem onClick={handleMenuClose}>हिंदी</MenuItem>
-                  <MenuItem onClick={handleMenuClose}>தமிழ்</MenuItem>
                 </Menu>
               </>
             )}
