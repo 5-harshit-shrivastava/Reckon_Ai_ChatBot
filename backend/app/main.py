@@ -4,18 +4,25 @@ from dotenv import load_dotenv
 import os
 import sys
 
-# Add parent directory to path for imports
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+# Add backend directory to path for proper imports in Vercel
+backend_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if backend_dir not in sys.path:
+    sys.path.insert(0, backend_dir)
 
 # Load environment variables
 load_dotenv()
 
-# Import routes
-from routes.users import router as users_router
-from routes.chat_sessions import router as chat_sessions_router
-from routes.chat_messages import router as chat_messages_router
-from routes.knowledge_base import router as knowledge_router
-from routes.admin import router as admin_router
+# Try to import routes, but handle import errors gracefully for minimal deployment
+try:
+    from routes.users import router as users_router
+    from routes.chat_sessions import router as chat_sessions_router
+    from routes.chat_messages import router as chat_messages_router
+    from routes.knowledge_base import router as knowledge_router
+    from routes.admin import router as admin_router
+    routes_available = True
+except ImportError as e:
+    print(f"Warning: Could not import all routes: {e}")
+    routes_available = False
 
 # Create FastAPI instance
 app = FastAPI(
@@ -61,12 +68,24 @@ async def ping():
     """Simple ping endpoint for testing"""
     return {"message": "pong"}
 
-# Include routers
-app.include_router(users_router)
-app.include_router(chat_sessions_router)
-app.include_router(chat_messages_router)
-app.include_router(knowledge_router)
-app.include_router(admin_router)
+@app.get("/debug")
+async def debug():
+    """Debug endpoint to check deployment status"""
+    return {
+        "status": "deployed",
+        "routes_available": routes_available,
+        "python_path": sys.path[:3],  # Show first 3 paths
+        "working_directory": os.getcwd(),
+        "backend_dir": backend_dir
+    }
+
+# Include routers only if they were successfully imported
+if routes_available:
+    app.include_router(users_router)
+    app.include_router(chat_sessions_router)
+    app.include_router(chat_messages_router)
+    app.include_router(knowledge_router)
+    app.include_router(admin_router)
 
 # For Vercel deployment
 handler = app
