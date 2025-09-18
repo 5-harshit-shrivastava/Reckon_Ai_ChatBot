@@ -88,7 +88,7 @@ if routes_available:
     app.include_router(admin_router)
 
 # For Vercel deployment
-handler = app
+app_handler = app
 
 if __name__ == "__main__":
     import uvicorn
