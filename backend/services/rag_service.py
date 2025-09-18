@@ -3,7 +3,6 @@ import time
 import json
 from typing import List, Dict, Optional, Tuple
 from sqlalchemy.orm import Session
-from openai import OpenAI
 from services.vector_search import VectorSearchService
 from services.gemini_service import GeminiService
 from models.knowledge_base import Document, DocumentChunk, KnowledgeBaseQuery

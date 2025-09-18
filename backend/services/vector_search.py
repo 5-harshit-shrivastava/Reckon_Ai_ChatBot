@@ -3,8 +3,6 @@ import time
 import numpy as np
 from typing import List, Dict, Tuple, Optional
 from sqlalchemy.orm import Session
-from sentence_transformers import SentenceTransformer
-from openai import OpenAI
 from pinecone import Pinecone, ServerlessSpec
 from models.knowledge_base import DocumentChunk, KnowledgeBaseQuery
 import json
@@ -18,12 +16,12 @@ class VectorSearchService:
         self.pinecone_client = None
         self.pinecone_index = None
         self.sentence_transformer = None
-        # Use ONLY Google EmbeddingGemma - no fallbacks for consistency
-        self.embedding_model = "google/embeddinggemma-300m"
-        self.vector_dimension = 768  # EmbeddingGemma dimensions
-        self.context_length = 2048  # EmbeddingGemma context length
-        self.model_description = "Google EmbeddingGemma - Premium multilingual embeddings"
-        self.index_name = "reckon-embeddinggemma-kb"
+        # Use BAAI/bge-large-en-v1.5 via Hugging Face API
+        self.embedding_model = "BAAI/bge-large-en-v1.5"
+        self.vector_dimension = 1024  # bge-large-en-v1.5 dimensions
+        self.context_length = 512  # bge-large-en-v1.5 context length
+        self.model_description = "BAAI/bge-large-en-v1.5 - High-quality embeddings for retrieval"
+        self.index_name = "reckon-bge-large-kb"
         self.initialize_services()
     
     def initialize_services(self):
@@ -42,10 +40,10 @@ class VectorSearchService:
                 if self.index_name not in index_names:
                     logger.info(f"Creating Pinecone multilingual index: {self.index_name}")
                     
-                    # Create index with Google EmbeddingGemma dimensions
+                    # Create index with bge-large-en-v1.5 dimensions
                     self.pinecone_client.create_index(
                         name=self.index_name,
-                        dimension=self.vector_dimension,  # 768 for Google EmbeddingGemma
+                        dimension=self.vector_dimension,  # 1024 for bge-large-en-v1.5
                         metric="cosine",
                         spec=ServerlessSpec(
                             cloud="aws", 
@@ -77,14 +75,14 @@ class VectorSearchService:
     
     def create_embedding(self, text: str, is_query: bool = False) -> List[float]:
         """
-        Create embedding using ONLY Google EmbeddingGemma
+        Create embedding using BAAI/bge-large-en-v1.5 via Hugging Face API
 
         Args:
             text: Text to embed
             is_query: Whether this is a query (True) or passage (False)
 
         Returns:
-            List of embedding values (768 dimensions for EmbeddingGemma)
+            List of embedding values (1024 dimensions for bge-large-en-v1.5)
         """
         try:
             # Truncate text if too long
@@ -92,45 +90,43 @@ class VectorSearchService:
                 text = text[:self.context_length]
                 logger.info(f"Truncated text to {self.context_length} characters")
 
-            logger.info(f"Creating embedding with Google EmbeddingGemma")
+            logger.info(f"Creating embedding with BAAI/bge-large-en-v1.5")
 
-            # Try local model first (more reliable for gated models)
-            embedding = self._create_embedding_local(text, is_query)
-
-            if embedding and len(embedding) == self.vector_dimension and sum(abs(x) for x in embedding) > 0.1:
-                logger.info(f"✅ Google EmbeddingGemma local success - {len(embedding)} dimensions")
-                return embedding
-
-            # If local fails, try API as fallback
-            logger.warning("Local model failed, trying Google EmbeddingGemma API")
+            # Use only Hugging Face API (no local model)
             embedding = self._create_embedding_with_api(text, self.embedding_model, is_query)
 
             if embedding and len(embedding) == self.vector_dimension:
-                logger.info(f"✅ Google EmbeddingGemma local success - {len(embedding)} dimensions")
+                logger.info(f"✅ bge-large-en-v1.5 API success - {len(embedding)} dimensions")
                 return embedding
             else:
-                logger.error(f"Local model returned wrong dimensions: {len(embedding) if embedding else 0}")
+                logger.error(f"API returned wrong dimensions: {len(embedding) if embedding else 0}")
                 return [0.0] * self.vector_dimension
 
         except Exception as e:
-            logger.error(f"Google EmbeddingGemma failed: {e}")
+            logger.error(f"bge-large-en-v1.5 API failed: {e}")
             # Return zero vector as last resort
             return [0.0] * self.vector_dimension
 
     def _create_embedding_with_api(self, text: str, model_name: str, is_query: bool = False) -> List[float]:
-        """Create embedding via HuggingFace API for Google EmbeddingGemma"""
+        """Create embedding via HuggingFace API for BAAI/bge-large-en-v1.5"""
         import requests
 
         hf_token = os.getenv("HUGGINGFACE_API_TOKEN")
         if not hf_token:
             raise Exception("No HuggingFace API token found")
 
-        # EmbeddingGemma doesn't need query/passage prefixes
-        formatted_text = text
+        # bge models use query/passage prefixes for better performance
+        if is_query:
+            formatted_text = f"query: {text}"
+        else:
+            formatted_text = f"passage: {text}"
 
         # Call HuggingFace API
-        api_url = f"https://api-inference.huggingface.co/pipeline/feature-extraction/{model_name}"
-        headers = {"Authorization": f"Bearer {hf_token}"}
+        api_url = f"https://api-inference.huggingface.co/models/{model_name}"
+        headers = {
+            "Authorization": f"Bearer {hf_token}",
+            "Content-Type": "application/json"
+        }
 
         response = requests.post(
             api_url,
@@ -145,7 +141,7 @@ class VectorSearchService:
             import numpy as np
             embedding = np.array(embedding)
 
-            # Ensure correct dimensions for EmbeddingGemma
+            # Ensure correct dimensions for bge-large-en-v1.5
             if len(embedding) != self.vector_dimension:
                 logger.warning(f"API returned {len(embedding)} dimensions, expected {self.vector_dimension}")
 
@@ -172,39 +168,9 @@ class VectorSearchService:
             return embedding
 
     def _create_embedding_local(self, text: str, is_query: bool = False) -> List[float]:
-        """Local Google EmbeddingGemma generation"""
-        try:
-            # Initialize sentence transformer if needed
-            if self.sentence_transformer is None:
-                logger.info(f"Initializing Google EmbeddingGemma locally: {self.embedding_model}")
-
-                # Login to HuggingFace first
-                hf_token = os.getenv("HUGGINGFACE_API_TOKEN")
-                if hf_token:
-                    from huggingface_hub import login
-                    login(token=hf_token, add_to_git_credential=False)
-                    logger.info("Logged into HuggingFace")
-
-                from sentence_transformers import SentenceTransformer
-                self.sentence_transformer = SentenceTransformer(self.embedding_model)
-
-            # EmbeddingGemma doesn't need query/passage prefixes
-            formatted_text = text
-
-            # Create embedding using Google EmbeddingGemma
-            embedding = self.sentence_transformer.encode(formatted_text, normalize_embeddings=True)
-
-            # Verify dimensions
-            if len(embedding) != self.vector_dimension:
-                logger.error(f"Local model returned {len(embedding)} dimensions, expected {self.vector_dimension}")
-                return [0.0] * self.vector_dimension
-
-            return embedding.tolist()
-
-        except Exception as e:
-            logger.error(f"Error creating local Google EmbeddingGemma embedding: {e}")
-            # Return zero vector as fallback
-            return [0.0] * self.vector_dimension
+        """Local method disabled - using only HuggingFace API"""
+        logger.warning("Local embedding generation is disabled - using API only")
+        return [0.0] * self.vector_dimension
     
     def store_chunk_embeddings(self, db: Session, chunks: List[DocumentChunk]) -> int:
         """
@@ -263,7 +229,7 @@ class VectorSearchService:
                     vectors=vectors,
                     namespace="reckon-knowledge-base"
                 )
-                logger.info(f"Stored {len(vectors)} chunks in Pinecone using Google EmbeddingGemma embeddings")
+                logger.info(f"Stored {len(vectors)} chunks in Pinecone using bge-large-en-v1.5 embeddings")
             
             db.commit()
             return stored_count
@@ -310,7 +276,7 @@ class VectorSearchService:
                 # Create query embedding (with query prefix)
                 query_embedding = self.create_embedding(query, is_query=True)
                 
-                # Search using vector query with Google EmbeddingGemma
+                # Search using vector query with bge-large-en-v1.5
                 search_response = self.pinecone_index.query(
                     namespace="reckon-knowledge-base",
                     vector=query_embedding,

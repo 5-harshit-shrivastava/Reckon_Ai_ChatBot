@@ -23,30 +23,10 @@ python-dotenv==1.0.0
 # Logging
 loguru==0.7.2
 
-# CORS middleware - use built-in FastAPI middleware
-
-# AI/ML Libraries
-openai>=1.6.1
-langchain>=0.1.0
-langchain-openai>=0.0.5
+# AI/ML Libraries (minimal set)
+google-generativeai>=0.3.0
 pinecone-client>=3.0.0
-transformers>=4.35.0
-torch>=2.1.0
-
-# Vector embeddings - Google EmbeddingGemma
-sentence-transformers>=2.2.2
 numpy>=1.24.3
-pandas>=2.0.3
-# For Google EmbeddingGemma support
-huggingface_hub>=0.16.4
 
 # Async database support
 aiosqlite==0.19.0
-
-# Testing
-pytest==7.4.3
-pytest-asyncio==0.21.1
-
-# Development
-black==23.11.0
-flake8==6.1.0
