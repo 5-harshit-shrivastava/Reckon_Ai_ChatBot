@@ -27,7 +27,7 @@ loguru==0.7.2
 
 # AI/ML Libraries (minimal set)
 google-generativeai>=0.3.0
-pinecone-client>=3.0.0
+pinecone>=3.0.0
 numpy>=1.24.3
 
 # Async database support
