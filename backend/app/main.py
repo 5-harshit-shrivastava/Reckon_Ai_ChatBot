@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 import os
 import sys
+import re
 
 # Add backend directory to path for proper imports in Vercel
 backend_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -32,16 +33,10 @@ app = FastAPI(
 )
 
 # Configure CORS for production deployment
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "https://reckon-user.vercel.app",
-        "https://reckon-admin.vercel.app",
-        "https://reckon-rag-chatbot-user.vercel.app",
-        "https://reckon-rag-chatbot-admin.vercel.app",
-        "http://localhost:3000",
-        "http://localhost:3001"
-    ],
+    allow_origin_regex=r"https://.*\.vercel\.app|http://localhost:\d+",
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["*"],
