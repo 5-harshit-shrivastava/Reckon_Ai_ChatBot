@@ -35,6 +35,8 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
+        "https://reckon-user.vercel.app",
+        "https://reckon-admin.vercel.app",
         "https://reckon-rag-chatbot-user.vercel.app",
         "https://reckon-rag-chatbot-admin.vercel.app",
         "http://localhost:3000",
