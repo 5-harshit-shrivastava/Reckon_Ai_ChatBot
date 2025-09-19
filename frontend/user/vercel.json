@@ -3,11 +3,7 @@
   "builds": [
     {
       "src": "package.json",
-      "use": "@vercel/static-build",
-      "env": {
-        "GENERATE_SOURCEMAP": "false",
-        "REACT_APP_API_URL": "https://bckreckon.vercel.app"
-      }
+      "use": "@vercel/static-build"
     }
   ],
   "routes": [
@@ -19,5 +15,9 @@
       "src": "/(.*)",
       "dest": "/index.html"
     }
-  ]
+  ],
+  "env": {
+    "GENERATE_SOURCEMAP": "false",
+    "REACT_APP_API_URL": "https://bckreckon.vercel.app"
+  }
 }
