@@ -66,17 +66,6 @@ const ChatPage: React.FC = () => {
     initializeSession();
   }, [location.state]);
 
-  // Handle pending message when session is ready
-  useEffect(() => {
-    if (sessionId && pendingMessage) {
-      console.log('Session ready, sending pending message:', pendingMessage);
-      setTimeout(() => {
-        handleSendMessage(pendingMessage);
-        setPendingMessage(null); // Clear pending message
-      }, 100);
-    }
-  }, [sessionId, pendingMessage, handleSendMessage]);
-
   const handleSendMessage = useCallback(async (content: string) => {
     if (!sessionId) {
       console.error('Session not initialized');
@@ -141,6 +130,17 @@ const ChatPage: React.FC = () => {
       }, 1000 + Math.random() * 1000);
     }
   }, [sessionId]);
+
+  // Handle pending message when session is ready
+  useEffect(() => {
+    if (sessionId && pendingMessage) {
+      console.log('Session ready, sending pending message:', pendingMessage);
+      setTimeout(() => {
+        handleSendMessage(pendingMessage);
+        setPendingMessage(null); // Clear pending message
+      }, 100);
+    }
+  }, [sessionId, pendingMessage, handleSendMessage]);
 
   const generateMockResponse = (userMessage: string): string => {
     const lowerMessage = userMessage.toLowerCase();
