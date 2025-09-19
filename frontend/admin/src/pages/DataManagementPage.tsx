@@ -31,7 +31,7 @@ import {
 } from '@mui/icons-material';
 import { AdminLayout } from '../components/AdminLayout';
 import { ReckonCard, colors } from '../shared';
-import AdminApiService, { KnowledgeBaseEntry, KnowledgeBaseCreate, KnowledgeBaseUpdate } from '../services/adminApi';
+import AdminApiService, { KnowledgeBaseEntry } from '../services/adminApi';
 
 const DataManagementPage: React.FC = () => {
   const [openDialog, setOpenDialog] = useState(false);
