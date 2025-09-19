@@ -18,6 +18,7 @@
   ],
   "env": {
     "GENERATE_SOURCEMAP": "false",
-    "REACT_APP_API_URL": "https://bckreckon.vercel.app"
+    "REACT_APP_API_URL": "https://bckreckon.vercel.app",
+    "CI": "false"
   }
 }
