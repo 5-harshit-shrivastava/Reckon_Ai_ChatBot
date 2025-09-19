@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Box, Paper } from '@mui/material';
 import { useLocation } from 'react-router-dom';
 import { Layout, ChatInterface, Message, colors } from '../shared';
@@ -75,9 +75,9 @@ const ChatPage: React.FC = () => {
         setPendingMessage(null); // Clear pending message
       }, 100);
     }
-  }, [sessionId, pendingMessage]);
+  }, [sessionId, pendingMessage, handleSendMessage]);
 
-  const handleSendMessage = async (content: string) => {
+  const handleSendMessage = useCallback(async (content: string) => {
     if (!sessionId) {
       console.error('Session not initialized');
       return;
@@ -140,7 +140,7 @@ const ChatPage: React.FC = () => {
         setIsTyping(false);
       }, 1000 + Math.random() * 1000);
     }
-  };
+  }, [sessionId]);
 
   const generateMockResponse = (userMessage: string): string => {
     const lowerMessage = userMessage.toLowerCase();
