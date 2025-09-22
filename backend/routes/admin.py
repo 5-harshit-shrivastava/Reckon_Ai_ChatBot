@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from sqlalchemy import desc, func, and_, or_, text
 from typing import List, Optional, Dict, Any
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import sys
 import os
 
@@ -91,7 +91,7 @@ async def get_dashboard_stats(db: Session = Depends(get_db)):
         success_rate = (completed_sessions / max(total_conversations, 1)) * 100
 
         # Calculate changes (compare with last week for now - simplified)
-        last_week = datetime.now() - timedelta(days=7)
+        last_week = datetime.now(timezone.utc) - timedelta(days=7)
 
         # Conversations change
         old_conversations = db.query(func.count(ChatSession.id)).filter(ChatSession.created_at < last_week).scalar() or 0
@@ -129,7 +129,12 @@ async def get_recent_activities(limit: int = 10, db: Session = Depends(get_db)):
         # Get recent knowledge base updates
         recent_docs = db.query(Document).filter(Document.is_active == True).order_by(desc(Document.updated_at)).limit(5).all()
         for doc in recent_docs:
-            time_diff = datetime.now() - doc.updated_at if doc.updated_at else datetime.now() - doc.created_at
+            current_time = datetime.now(timezone.utc)
+            doc_time = doc.updated_at if doc.updated_at else doc.created_at
+            # Handle timezone-aware datetime comparison
+            if doc_time.tzinfo is None:
+                doc_time = doc_time.replace(tzinfo=timezone.utc)
+            time_diff = current_time - doc_time
             hours_ago = int(time_diff.total_seconds() / 3600)
             activities.append(RecentActivity(
                 id=doc.id,
@@ -142,7 +147,12 @@ async def get_recent_activities(limit: int = 10, db: Session = Depends(get_db)):
         # Get recent chat sessions
         recent_sessions = db.query(ChatSession).order_by(desc(ChatSession.created_at)).limit(3).all()
         for session in recent_sessions:
-            time_diff = datetime.now() - session.created_at
+            current_time = datetime.now(timezone.utc)
+            session_time = session.created_at
+            # Handle timezone-aware datetime comparison
+            if session_time.tzinfo is None:
+                session_time = session_time.replace(tzinfo=timezone.utc)
+            time_diff = current_time - session_time
             hours_ago = int(time_diff.total_seconds() / 3600)
             activities.append(RecentActivity(
                 id=session.id,
@@ -469,7 +479,7 @@ async def get_system_status(db: Session = Depends(get_db)):
             "total_documents": total_docs,
             "total_chunks": total_chunks,
             "total_sessions": total_sessions,
-            "last_updated": datetime.now().isoformat()
+            "last_updated": datetime.now(timezone.utc).isoformat()
         }
 
     except Exception as e:
@@ -478,5 +488,5 @@ async def get_system_status(db: Session = Depends(get_db)):
             "api_services_status": "error",
             "vector_store_status": "error",
             "error": str(e),
-            "last_updated": datetime.now().isoformat()
+            "last_updated": datetime.now(timezone.utc).isoformat()
         }
