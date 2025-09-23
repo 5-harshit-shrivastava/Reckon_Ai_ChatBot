@@ -129,7 +129,7 @@ const ChatPage: React.FC = () => {
         setIsTyping(false);
       }, 1000 + Math.random() * 1000);
     }
-  }, [sessionId]);
+  }, [sessionId, generateMockResponse]);
 
   // Handle pending message when session is ready
   useEffect(() => {
@@ -199,7 +199,7 @@ const ChatPage: React.FC = () => {
     return 'general_query';
   };
 
-  const generateMockResponse = (userMessage: string): string => {
+  const generateMockResponse = useCallback((userMessage: string): string => {
     const intent = detectIntent(userMessage);
 
     // Handle name introduction
@@ -236,7 +236,7 @@ const ChatPage: React.FC = () => {
     }
 
     return `Thank you for your question about "${userMessage}". I'm here to help with all Reckon-related queries. Could you provide more specific details so I can give you the most relevant assistance?\n\nI can help with:\n• Billing and invoicing\n• GST compliance\n• Inventory management\n• Multi-branch operations\n• Technical support`;
-  };
+  }, [userName]);
 
   const handleContactAction = (action: 'call' | 'email' | 'demo') => {
     switch (action) {
