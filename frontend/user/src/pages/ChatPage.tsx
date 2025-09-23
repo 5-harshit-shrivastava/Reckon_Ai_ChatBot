@@ -37,8 +37,9 @@ const ChatPage: React.FC = () => {
         });
         setSessionId(session.id);
 
-        // Always start with empty messages for new session
-        setMessages([]);
+        // Start with Rico's welcome message
+        const welcomeMessage = createWelcomeMessage();
+        setMessages([welcomeMessage]);
 
         // Handle initial message after session is created
         if (initialMessage) {
@@ -51,8 +52,9 @@ const ChatPage: React.FC = () => {
         const fallbackSessionId = Date.now();
         setSessionId(fallbackSessionId);
 
-        // Initialize with empty messages array
-        setMessages([]);
+        // Initialize with Rico's welcome message
+        const welcomeMessage = createWelcomeMessage();
+        setMessages([welcomeMessage]);
 
         // Handle initial message even in fallback case
         console.log('Fallback - Initial message from state:', initialMessage);
@@ -68,6 +70,20 @@ const ChatPage: React.FC = () => {
 
   // State to store user name for personalized responses
   const [userName, setUserName] = useState<string | null>(null);
+
+  // Create Rico's welcome message
+  const createWelcomeMessage = (): Message => {
+    return {
+      id: uuidv4(),
+      content: "Hello! I'm Rico, your Reckon AI assistant. How can I help you today?",
+      sender: 'assistant',
+      timestamp: new Date(),
+      type: 'text',
+      confidence: 100,
+      responseTime: 0,
+      status: 'delivered',
+    };
+  };
 
   const extractUserName = (message: string): string | null => {
     const lowerMessage = message.toLowerCase();
