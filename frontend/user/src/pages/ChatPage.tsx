@@ -66,82 +66,6 @@ const ChatPage: React.FC = () => {
     initializeSession();
   }, [location.state]);
 
-  const handleSendMessage = useCallback(async (content: string) => {
-    if (!sessionId) {
-      console.error('Session not initialized');
-      return;
-    }
-
-    const userMessage: Message = {
-      id: uuidv4(),
-      content,
-      sender: 'user',
-      timestamp: new Date(),
-      type: 'text',
-    };
-
-    setMessages(prev => [...prev, userMessage]);
-    setIsTyping(true);
-
-    try {
-      // Call the backend API
-      const response = await ChatApiService.sendMessage({
-        session_id: sessionId,
-        message: content,
-        user_id: 1, // Default user ID for now
-        channel: 'web',
-        language: 'en',
-      });
-
-      setTimeout(() => {
-        const assistantMessage: Message = {
-          id: uuidv4(),
-          content: response.assistant_response?.message_text || generateMockResponse(content),
-          sender: 'assistant',
-          timestamp: new Date(),
-          type: 'text',
-          confidence: Math.floor(Math.random() * 11) + 90, // 90-100% confidence
-          responseTime: Math.floor(Math.random() * 100) + 80, // 80-180ms response time
-          status: 'delivered',
-        };
-
-        setMessages(prev => [...prev, assistantMessage]);
-        setIsTyping(false);
-      }, 1000 + Math.random() * 1000); // Simulate typing delay
-    } catch (error) {
-      console.error('Error sending message:', error);
-      console.log('API Error Details:', ChatApiService.handleApiError(error));
-
-      // Fallback to mock response
-      setTimeout(() => {
-        const assistantMessage: Message = {
-          id: uuidv4(),
-          content: generateMockResponse(content),
-          sender: 'assistant',
-          timestamp: new Date(),
-          type: 'text',
-          confidence: Math.floor(Math.random() * 11) + 90, // 90-100% confidence
-          responseTime: Math.floor(Math.random() * 100) + 80, // 80-180ms response time
-          status: 'delivered',
-        };
-
-        setMessages(prev => [...prev, assistantMessage]);
-        setIsTyping(false);
-      }, 1000 + Math.random() * 1000);
-    }
-  }, [sessionId, generateMockResponse]);
-
-  // Handle pending message when session is ready
-  useEffect(() => {
-    if (sessionId && pendingMessage) {
-      console.log('Session ready, sending pending message:', pendingMessage);
-      setTimeout(() => {
-        handleSendMessage(pendingMessage);
-        setPendingMessage(null); // Clear pending message
-      }, 100);
-    }
-  }, [sessionId, pendingMessage, handleSendMessage]);
-
   // State to store user name for personalized responses
   const [userName, setUserName] = useState<string | null>(null);
 
@@ -237,6 +161,82 @@ const ChatPage: React.FC = () => {
 
     return `Thank you for your question about "${userMessage}". I'm here to help with all Reckon-related queries. Could you provide more specific details so I can give you the most relevant assistance?\n\nI can help with:\n• Billing and invoicing\n• GST compliance\n• Inventory management\n• Multi-branch operations\n• Technical support`;
   }, [userName]);
+
+  const handleSendMessage = useCallback(async (content: string) => {
+    if (!sessionId) {
+      console.error('Session not initialized');
+      return;
+    }
+
+    const userMessage: Message = {
+      id: uuidv4(),
+      content,
+      sender: 'user',
+      timestamp: new Date(),
+      type: 'text',
+    };
+
+    setMessages(prev => [...prev, userMessage]);
+    setIsTyping(true);
+
+    try {
+      // Call the backend API
+      const response = await ChatApiService.sendMessage({
+        session_id: sessionId,
+        message: content,
+        user_id: 1, // Default user ID for now
+        channel: 'web',
+        language: 'en',
+      });
+
+      setTimeout(() => {
+        const assistantMessage: Message = {
+          id: uuidv4(),
+          content: response.assistant_response?.message_text || generateMockResponse(content),
+          sender: 'assistant',
+          timestamp: new Date(),
+          type: 'text',
+          confidence: Math.floor(Math.random() * 11) + 90, // 90-100% confidence
+          responseTime: Math.floor(Math.random() * 100) + 80, // 80-180ms response time
+          status: 'delivered',
+        };
+
+        setMessages(prev => [...prev, assistantMessage]);
+        setIsTyping(false);
+      }, 1000 + Math.random() * 1000); // Simulate typing delay
+    } catch (error) {
+      console.error('Error sending message:', error);
+      console.log('API Error Details:', ChatApiService.handleApiError(error));
+
+      // Fallback to mock response
+      setTimeout(() => {
+        const assistantMessage: Message = {
+          id: uuidv4(),
+          content: generateMockResponse(content),
+          sender: 'assistant',
+          timestamp: new Date(),
+          type: 'text',
+          confidence: Math.floor(Math.random() * 11) + 90, // 90-100% confidence
+          responseTime: Math.floor(Math.random() * 100) + 80, // 80-180ms response time
+          status: 'delivered',
+        };
+
+        setMessages(prev => [...prev, assistantMessage]);
+        setIsTyping(false);
+      }, 1000 + Math.random() * 1000);
+    }
+  }, [sessionId, generateMockResponse]);
+
+  // Handle pending message when session is ready
+  useEffect(() => {
+    if (sessionId && pendingMessage) {
+      console.log('Session ready, sending pending message:', pendingMessage);
+      setTimeout(() => {
+        handleSendMessage(pendingMessage);
+        setPendingMessage(null); // Clear pending message
+      }, 100);
+    }
+  }, [sessionId, pendingMessage, handleSendMessage]);
 
   const handleContactAction = (action: 'call' | 'email' | 'demo') => {
     switch (action) {
