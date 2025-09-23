@@ -142,22 +142,96 @@ const ChatPage: React.FC = () => {
     }
   }, [sessionId, pendingMessage, handleSendMessage]);
 
-  const generateMockResponse = (userMessage: string): string => {
-    const lowerMessage = userMessage.toLowerCase();
+  // State to store user name for personalized responses
+  const [userName, setUserName] = useState<string | null>(null);
 
-    if (lowerMessage.includes('erp') || lowerMessage.includes('advantage')) {
+  const extractUserName = (message: string): string | null => {
+    const lowerMessage = message.toLowerCase();
+    const patterns = [
+      "my name is ",
+      "i am ",
+      "call me ",
+      "i'm "
+    ];
+
+    for (const pattern of patterns) {
+      if (lowerMessage.includes(pattern)) {
+        const startIndex = lowerMessage.indexOf(pattern) + pattern.length;
+        const namePart = message.substring(startIndex).trim();
+
+        // Extract first word/name
+        const nameMatch = namePart.match(/^([a-zA-Z][\w\s\-']*?)(?:\s|[.!?]|$)/);
+        if (nameMatch) {
+          const extractedName = nameMatch[1].trim();
+          // Clean up common trailing words
+          const stopWords = ["and", "but", "from", "here", "there"];
+          const words = extractedName.split(' ');
+          if (words.length > 0 && !stopWords.includes(words[words.length - 1].toLowerCase())) {
+            return extractedName.split(' ')[0]; // Take first word as name
+          }
+        }
+      }
+    }
+    return null;
+  };
+
+  const detectIntent = (message: string): string => {
+    const lowerMessage = message.toLowerCase();
+
+    if (lowerMessage.includes('my name is') || lowerMessage.includes('i am') || lowerMessage.includes('call me')) {
+      return 'name_introduction';
+    }
+    if (['hello', 'hi', 'hey', 'good morning', 'good evening'].some(word => lowerMessage.includes(word))) {
+      return 'greeting';
+    }
+    if (['erp', 'advantage'].some(word => lowerMessage.includes(word))) {
+      return 'erp_query';
+    }
+    if (['gst', 'tax'].some(word => lowerMessage.includes(word))) {
+      return 'gst_query';
+    }
+    if (['inventory', 'stock'].some(word => lowerMessage.includes(word))) {
+      return 'inventory_query';
+    }
+    if (['billing', 'invoice'].some(word => lowerMessage.includes(word))) {
+      return 'billing_query';
+    }
+    return 'general_query';
+  };
+
+  const generateMockResponse = (userMessage: string): string => {
+    const intent = detectIntent(userMessage);
+
+    // Handle name introduction
+    if (intent === 'name_introduction') {
+      const extractedName = extractUserName(userMessage);
+      if (extractedName) {
+        setUserName(extractedName);
+        return `Nice to meet you, ${extractedName}! I'm Rico, your Reckon AI assistant. How can I help you today?`;
+      } else {
+        return `Nice to meet you! I'm Rico, your Reckon AI assistant. How can I help you today?`;
+      }
+    }
+
+    // Handle greetings with personalization
+    if (intent === 'greeting') {
+      return `Hello${userName ? ' ' + userName : ''}! I'm Rico, your Reckon AI assistant. How can I help you today?`;
+    }
+
+    // Handle other intents
+    if (intent === 'erp_query') {
       return `Great question about ERP advantages! Reckon ERP offers:\n\n• Integrated billing and inventory management\n• Real-time GST compliance\n• Multi-location support\n• Automated financial reporting\n• Cloud-based accessibility\n\nWould you like me to explain any specific feature in detail?`;
     }
 
-    if (lowerMessage.includes('gst') || lowerMessage.includes('tax')) {
+    if (intent === 'gst_query') {
       return `For GST compliance, Reckon helps with:\n\n• Automatic GST calculation\n• GSTR-1, GSTR-3B filing\n• Input tax credit management\n• E-way bill generation\n• Compliance reports\n\nDo you need help with a specific GST return or compliance issue?`;
     }
 
-    if (lowerMessage.includes('inventory') || lowerMessage.includes('stock')) {
+    if (intent === 'inventory_query') {
       return `Reckon's inventory management includes:\n\n• Real-time stock tracking\n• Low stock alerts\n• Batch and serial number tracking\n• Multi-warehouse management\n• Purchase and sales integration\n\nWhat specific inventory challenge are you facing?`;
     }
 
-    if (lowerMessage.includes('billing') || lowerMessage.includes('invoice')) {
+    if (intent === 'billing_query') {
       return `Our billing system offers:\n\n• Professional invoice templates\n• Automatic tax calculations\n• Payment tracking\n• Recurring billing setup\n• Integration with payment gateways\n\nHow can I help with your billing requirements?`;
     }
 

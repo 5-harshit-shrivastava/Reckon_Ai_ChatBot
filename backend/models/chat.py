@@ -15,6 +15,7 @@ class ChatSession(Base):
     channel = Column(String(50), default="web")  # web, mobile, whatsapp
     language = Column(String(10), default="en")  # en, hi
     is_active = Column(Boolean, default=True)
+    session_metadata = Column(Text, nullable=True)  # JSON string for session data like user names
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     ended_at = Column(DateTime(timezone=True), nullable=True)
     

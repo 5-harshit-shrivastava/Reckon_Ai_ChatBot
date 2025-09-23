@@ -6,7 +6,9 @@ import sys
 import os
 import json
 import time
+import re
 from datetime import datetime, timedelta
+from loguru import logger
 
 # Add parent directory to path for imports
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -142,21 +144,47 @@ async def send_message(request: SendMessageRequest, db: Session = Depends(get_db
             if user:
                 industry_context = user.industry_type
         
-        # Generate RAG-powered response
-        rag_response = rag_service.generate_rag_response(
-            db=db,
-            user_query=request.message,
-            session_id=request.session_id,
-            user_id=session.user_id,
-            industry_context=industry_context,
-            language=request.language.value
-        )
-        
-        # Extract response data
-        ai_response_text = rag_response.get("response", "I'm sorry, I couldn't generate a response.")
-        detected_intent = detect_simple_intent(request.message)  # Keep for backward compatibility
-        response_time = rag_response.get("processing_time_ms", int((time.time() - start_time) * 1000))
-        confidence_score = rag_response.get("confidence", 0.7)
+        # Detect intent and handle special cases
+        detected_intent = detect_simple_intent(request.message)
+
+        # Handle name introduction specially
+        extracted_name = None
+        if detected_intent == "name_introduction":
+            extracted_name = extract_user_name(request.message)
+            if extracted_name:
+                # Store the name in session metadata
+                store_user_name_in_session(db, request.session_id, extracted_name)
+
+        # Get stored user name for personalized responses
+        stored_user_name = get_user_name_from_session(db, request.session_id)
+        current_user_name = extracted_name or stored_user_name
+
+        # Generate appropriate response
+        if detected_intent in ["greeting", "name_introduction"]:
+            # Use simple response for greetings and name introductions
+            ai_response_text = generate_simple_response(
+                request.message,
+                detected_intent,
+                request.language,
+                current_user_name
+            )
+            response_time = int((time.time() - start_time) * 1000)
+            confidence_score = 0.95  # High confidence for rule-based responses
+        else:
+            # Use RAG-powered response for other queries
+            rag_response = rag_service.generate_rag_response(
+                db=db,
+                user_query=request.message,
+                session_id=request.session_id,
+                user_id=session.user_id,
+                industry_context=industry_context,
+                language=request.language.value
+            )
+
+            # Extract response data
+            ai_response_text = rag_response.get("response", "I'm sorry, I couldn't generate a response.")
+            response_time = rag_response.get("processing_time_ms", int((time.time() - start_time) * 1000))
+            confidence_score = rag_response.get("confidence", 0.7)
         
         # Create assistant response message metadata
         assistant_message_metadata = {
@@ -537,7 +565,7 @@ async def create_embeddings(db: Session = Depends(get_db)):
 def detect_simple_intent(message: str) -> str:
     """Simple rule-based intent detection"""
     message_lower = message.lower()
-    
+
     # Reckon-specific intents
     if any(word in message_lower for word in ["order", "status", "track", "delivery"]):
         return "order_status"
@@ -553,15 +581,88 @@ def detect_simple_intent(message: str) -> str:
         return "sales_inquiry"
     elif any(word in message_lower for word in ["hello", "hi", "hey", "good morning", "good evening"]):
         return "greeting"
+    elif "my name is" in message_lower or "i am" in message_lower or "call me" in message_lower:
+        return "name_introduction"
     else:
         return "general_query"
 
-def generate_simple_response(message: str, intent: str, language) -> str:
+def extract_user_name(message: str) -> Optional[str]:
+    """Extract user name from introduction messages"""
+    message_lower = message.lower()
+
+    # Common patterns for name introduction
+    patterns = [
+        "my name is ",
+        "i am ",
+        "call me ",
+        "i'm "
+    ]
+
+    for pattern in patterns:
+        if pattern in message_lower:
+            # Extract the part after the pattern
+            start_index = message_lower.find(pattern) + len(pattern)
+            name_part = message[start_index:].strip()
+
+            # Take only the first word/name (stop at punctuation or common words)
+            # Match letters, spaces, hyphens, apostrophes (common in names)
+            name_match = re.match(r"([a-zA-Z][\w\s\-']*?)(?:\s|[.!?]|$)", name_part)
+            if name_match:
+                extracted_name = name_match.group(1).strip()
+                # Clean up common trailing words
+                stop_words = ["and", "but", "from", "here", "there"]
+                words = extracted_name.split()
+                if words and words[-1].lower() not in stop_words:
+                    return extracted_name.title()  # Capitalize properly
+    return None
+
+def store_user_name_in_session(db: Session, session_id: int, user_name: str):
+    """Store user name in session metadata"""
+    try:
+        session = db.query(ChatSession).filter(ChatSession.id == session_id).first()
+        if session:
+            # Get existing metadata or create new
+            metadata = {}
+            if session.session_metadata:
+                try:
+                    metadata = json.loads(session.session_metadata)
+                except json.JSONDecodeError:
+                    pass
+
+            # Store the user name
+            metadata["user_name"] = user_name
+            metadata["name_stored_at"] = datetime.utcnow().isoformat()
+
+            # Update session metadata
+            session.session_metadata = json.dumps(metadata)
+            db.commit()
+            return True
+    except Exception as e:
+        logger.error(f"Error storing user name in session: {e}")
+        db.rollback()
+    return False
+
+def get_user_name_from_session(db: Session, session_id: int) -> Optional[str]:
+    """Retrieve user name from session metadata"""
+    try:
+        session = db.query(ChatSession).filter(ChatSession.id == session_id).first()
+        if session and session.session_metadata:
+            try:
+                metadata = json.loads(session.session_metadata)
+                return metadata.get("user_name")
+            except json.JSONDecodeError:
+                pass
+    except Exception as e:
+        logger.error(f"Error retrieving user name from session: {e}")
+    return None
+
+def generate_simple_response(message: str, intent: str, language, user_name: str = None) -> str:
     """Generate simple rule-based responses"""
-    
+
     responses = {
         "en": {
-            "greeting": "Hello! Welcome to Reckon Support. How can I assist you today?",
+            "greeting": f"Hello{' ' + user_name if user_name else ''}! I'm Rico, your Reckon AI assistant. How can I help you today?",
+            "name_introduction": f"Nice to meet you, {user_name if user_name else 'there'}! I'm Rico, your Reckon AI assistant. How can I help you today?",
             "order_status": "I can help you track your order. Please provide your order number or email address.",
             "billing": "I can assist with billing queries. What specific billing information do you need?",
             "inventory": "For inventory queries, I can help you check stock levels or product information. What would you like to know?",
@@ -571,7 +672,8 @@ def generate_simple_response(message: str, intent: str, language) -> str:
             "general_query": "I'm here to help with your Reckon-related questions. Can you please provide more details about what you need assistance with?"
         },
         "hi": {
-            "greeting": "नमस्ते! Reckon Support में आपका स्वागत है। आज मैं आपकी कैसे सहायता कर सकता हूँ?",
+            "greeting": f"नमस्ते{' ' + user_name if user_name else ''}! मैं Rico हूँ, आपका Reckon AI सहायक। आज मैं आपकी कैसे मदद कर सकता हूँ?",
+            "name_introduction": f"आपसे मिलकर खुशी हुई, {user_name if user_name else 'वहाँ'}! मैं Rico हूँ, आपका Reckon AI सहायक। आज मैं आपकी कैसे मदद कर सकता हूँ?",
             "order_status": "मैं आपके ऑर्डर को ट्रैक करने में मदद कर सकता हूँ। कृपया अपना ऑर्डर नंबर या ईमेल पता प्रदान करें।",
             "billing": "मैं बिलिंग प्रश्नों में सहायता कर सकता हूँ। आपको किस विशिष्ट बिलिंग जानकारी की आवश्यकता है?",
             "inventory": "इन्वेंट्री प्रश्नों के लिए, मैं स्टॉक स्तर या उत्पाद जानकारी की जांच में आपकी सहायता कर सकता हूँ। आप क्या जानना चाहते हैं?",
