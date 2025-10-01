@@ -36,6 +36,8 @@ interface ChatInterfaceProps {
   suggestions?: string[];
   showContactOptions?: boolean;
   onContactAction?: (action: 'call' | 'email' | 'demo') => void;
+  selectedSuggestion?: string;
+  suggestionsMarquee?: boolean;
 }
 
 export const ChatInterface: React.FC<ChatInterfaceProps> = ({
@@ -44,6 +46,8 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
   isTyping = false,
   placeholder = "Type your message...",
   suggestions = [],
+  selectedSuggestion,
+  suggestionsMarquee = false,
 }) => {
   const [inputValue, setInputValue] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -253,41 +257,113 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
         <div ref={messagesEndRef} />
 
         {/* Suggestions inside messages area */}
-        {suggestions.length > 0 && (
-          <Box sx={{ p: 3, pt: 2, bgcolor: '#ffffff' }}>
+        {suggestions.length > 0 && !suggestionsMarquee && (
+          <Box sx={{ p: 3, pt: 2, bgcolor: '#ffffff', display: 'flex', justifyContent: 'flex-end' }}>
             <Box
               sx={{
                 display: 'flex',
                 flexWrap: 'wrap',
                 gap: 1.5,
+                maxWidth: '80%',
+                justifyContent: 'flex-end',
                 maxHeight: { xs: 120, sm: 'none' },
                 overflowY: { xs: 'auto', sm: 'visible' },
               }}
             >
-              {suggestions.map((suggestion, index) => (
-                <Chip
-                  key={index}
-                  label={suggestion}
-                  variant="outlined"
-                  onClick={() => handleSuggestionClick(suggestion)}
-                  sx={{
-                    borderColor: '#dadce0',
-                    color: '#3c4043',
-                    fontSize: '13px',
-                    height: 'auto',
-                    py: 1,
-                    px: 2,
-                    borderRadius: 3,
-                    '&:hover': {
-                      bgcolor: '#f8f9fa',
-                      borderColor: '#4285f4',
-                      color: '#4285f4',
-                    },
-                    transition: 'all 0.2s ease',
-                  }}
-                />
-              ))}
+              {suggestions.map((suggestion, index) => {
+                const isSelected = selectedSuggestion && suggestion.toLowerCase() === selectedSuggestion.toLowerCase();
+                return (
+                  <Chip
+                    key={index}
+                    label={suggestion}
+                    variant={isSelected ? 'filled' : 'outlined'}
+                    onClick={() => handleSuggestionClick(suggestion)}
+                    sx={{
+                      borderColor: isSelected ? '#4285f4' : '#dadce0',
+                      bgcolor: isSelected ? '#4285f4' : 'transparent',
+                      color: isSelected ? 'white' : '#3c4043',
+                      fontSize: '13px',
+                      height: 'auto',
+                      py: 1,
+                      px: 2,
+                      borderRadius: 3,
+                      '&:hover': {
+                        bgcolor: isSelected ? '#3367d6' : '#f8f9fa',
+                        borderColor: '#4285f4',
+                        color: isSelected ? 'white' : '#4285f4',
+                      },
+                      transition: 'all 0.2s ease',
+                    }}
+                  />
+                );
+              })}
             </Box>
+          </Box>
+        )}
+
+        {/* Marquee-style suggestions (animated rows) */}
+        {suggestions.length > 0 && suggestionsMarquee && (
+          <Box sx={{ p: 0, pt: 1.5, pb: 2, bgcolor: '#ffffff' }}>
+            {([0, 1, 2] as const).map((rowIdx) => (
+              <Box
+                key={rowIdx}
+                sx={{
+                  position: 'relative',
+                  overflow: 'hidden',
+                  px: 3,
+                  mb: rowIdx < 2 ? 1.25 : 0,
+                }}
+              >
+                <Box
+                  sx={{
+                    display: 'flex',
+                    gap: 1.5,
+                    animation: `scroll-left-${rowIdx} ${38 + rowIdx * 5}s linear infinite`,
+                    '@keyframes scroll-left-0': {
+                      '0%': { transform: 'translateX(0%)' },
+                      '100%': { transform: 'translateX(-50%)' },
+                    },
+                    '@keyframes scroll-left-1': {
+                      '0%': { transform: 'translateX(0%)' },
+                      '100%': { transform: 'translateX(-50%)' },
+                    },
+                    '@keyframes scroll-left-2': {
+                      '0%': { transform: 'translateX(0%)' },
+                      '100%': { transform: 'translateX(-50%)' },
+                    },
+                  }}
+                >
+                  {[
+                    ...suggestions.slice(rowIdx * Math.ceil(suggestions.length / 3), (rowIdx + 1) * Math.ceil(suggestions.length / 3)),
+                    ...suggestions.slice(rowIdx * Math.ceil(suggestions.length / 3), (rowIdx + 1) * Math.ceil(suggestions.length / 3)),
+                  ].map((suggestion, index) => (
+                    <Chip
+                      key={`${rowIdx}-${index}`}
+                      label={suggestion}
+                      variant="outlined"
+                      onClick={() => handleSuggestionClick(suggestion)}
+                      sx={{
+                        borderColor: '#dadce0',
+                        color: '#3c4043',
+                        fontSize: '13px',
+                        height: 'auto',
+                        py: 1,
+                        px: 2,
+                        borderRadius: 3,
+                        whiteSpace: 'nowrap',
+                        bgcolor: 'white',
+                        '&:hover': {
+                          bgcolor: '#f8f9fa',
+                          borderColor: '#4285f4',
+                          color: '#4285f4',
+                        },
+                        transition: 'all 0.2s ease',
+                      }}
+                    />
+                  ))}
+                </Box>
+              </Box>
+            ))}
           </Box>
         )}
       </Box>
