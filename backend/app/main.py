@@ -14,14 +14,24 @@ if backend_dir not in sys.path:
 load_dotenv()
 
 # Try to import routes, but handle import errors gracefully for minimal deployment
+import traceback
+routes_available = False
+import_error_message = ""
+
 try:
     # Using Pinecone-only routes (no PostgreSQL/Neon database)
     from routes.knowledge_base_pinecone import router as knowledge_router
     from routes.admin_pinecone import router as admin_router
     routes_available = True
+    print("✅ Routes imported successfully")
 except ImportError as e:
-    print(f"Warning: Could not import all routes: {e}")
-    routes_available = False
+    import_error_message = f"Import error: {str(e)}"
+    print(f"❌ Warning: Could not import all routes: {e}")
+    traceback.print_exc()
+except Exception as e:
+    import_error_message = f"Unexpected error: {str(e)}"
+    print(f"❌ Unexpected error importing routes: {e}")
+    traceback.print_exc()
 
 # Create FastAPI instance
 app = FastAPI(
@@ -70,6 +80,7 @@ async def debug():
     return {
         "status": "deployed",
         "routes_available": routes_available,
+        "import_error": import_error_message if not routes_available else None,
         "python_path": sys.path[:3],  # Show first 3 paths
         "working_directory": os.getcwd(),
         "backend_dir": backend_dir
