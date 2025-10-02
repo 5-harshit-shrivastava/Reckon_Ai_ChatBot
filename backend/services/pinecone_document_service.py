@@ -68,9 +68,9 @@ class PineconeDocumentService:
 
             # Chunk the document
             chunks_data = self.document_processor.chunk_document(
-                content=content,
+                text=content,
                 chunk_size=chunk_size,
-                chunk_overlap=chunk_overlap
+                overlap=chunk_overlap
             )
 
             # Prepare vectors for Pinecone
