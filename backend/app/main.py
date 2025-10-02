@@ -56,8 +56,8 @@ app.add_middleware(
 async def root():
     """Root endpoint"""
     return {
-        "message": "Welcome to Reckon ChatBot API",
-        "version": "1.0.0",
+        "message": "Welcome to Reckon ChatBot API v2",
+        "version": "2.0.2",
         "status": "active"
     }
 
