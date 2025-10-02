@@ -15,11 +15,9 @@ load_dotenv()
 
 # Try to import routes, but handle import errors gracefully for minimal deployment
 try:
-    from routes.users import router as users_router
-    from routes.chat_sessions import router as chat_sessions_router
-    from routes.chat_messages import router as chat_messages_router
-    from routes.knowledge_base import router as knowledge_router
-    from routes.admin import router as admin_router
+    # Using Pinecone-only routes (no PostgreSQL/Neon database)
+    from routes.knowledge_base_pinecone import router as knowledge_router
+    from routes.admin_pinecone import router as admin_router
     routes_available = True
 except ImportError as e:
     print(f"Warning: Could not import all routes: {e}")
@@ -78,9 +76,6 @@ async def debug():
 
 # Include routers only if they were successfully imported
 if routes_available:
-    app.include_router(users_router)
-    app.include_router(chat_sessions_router)
-    app.include_router(chat_messages_router)
     app.include_router(knowledge_router)
     app.include_router(admin_router)
 
