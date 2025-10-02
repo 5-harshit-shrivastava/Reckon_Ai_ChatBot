@@ -22,6 +22,7 @@ try:
     # Using Pinecone-only routes (no PostgreSQL/Neon database)
     from routes.knowledge_base_pinecone import router as knowledge_router
     from routes.admin_pinecone import router as admin_router
+    from routes.chat_simple import router as chat_router
     routes_available = True
     print("✅ Routes imported successfully")
 except ImportError as e:
@@ -90,6 +91,7 @@ async def debug():
 if routes_available:
     app.include_router(knowledge_router)
     app.include_router(admin_router)
+    app.include_router(chat_router)
 
 # For Vercel deployment
 app_handler = app
