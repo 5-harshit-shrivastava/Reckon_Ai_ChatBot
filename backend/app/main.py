@@ -37,7 +37,7 @@ except Exception as e:
 app = FastAPI(
     title="Reckon ChatBot API",
     description="RAG-based chatbot API - Pinecone Only",
-    version="2.0.0"
+    version="2.0.1"
 )
 
 # Configure CORS for production deployment
