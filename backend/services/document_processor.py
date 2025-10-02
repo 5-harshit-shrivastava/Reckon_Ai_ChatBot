@@ -210,7 +210,8 @@ class DocumentProcessor:
             
             processed_chunk = {
                 **chunk,
-                'keywords': ', '.join(keywords) if keywords else None,
+                'keywords': ', '.join(keywords) if keywords else '',
+                'section_title': chunk.get('section_title', ''),
                 'confidence_score': confidence,
                 'overlap_with_previous': 0  # Will be set when saving to DB
             }
