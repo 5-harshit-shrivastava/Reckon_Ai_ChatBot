@@ -26,8 +26,8 @@ except ImportError as e:
 # Create FastAPI instance
 app = FastAPI(
     title="Reckon ChatBot API",
-    description="RAG-based chatbot API for ReckonSales ERP platform",
-    version="1.0.0"
+    description="RAG-based chatbot API - Pinecone Only",
+    version="2.0.0"
 )
 
 # Configure CORS for production deployment
@@ -54,8 +54,9 @@ async def health_check():
     """Health check endpoint"""
     return {
         "status": "healthy",
-        "message": "Reckon ChatBot API is running",
-        "version": "1.0.0"
+        "message": "Reckon ChatBot API is running - Pinecone Only",
+        "version": "2.0.0",
+        "storage": "pinecone_only"
     }
 
 @app.get("/ping")
