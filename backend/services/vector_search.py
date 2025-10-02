@@ -275,8 +275,8 @@ class VectorSearchService:
                 
                 # Create query embedding (with query prefix)
                 query_embedding = self.create_embedding(query, is_query=True)
-                
-                # Search using vector query with bge-large-en-v1.5
+
+                # Search ONLY in our namespace (ignore old default namespace)
                 search_response = self.pinecone_index.query(
                     namespace="reckon-knowledge-base",
                     vector=query_embedding,
@@ -284,8 +284,9 @@ class VectorSearchService:
                     include_metadata=True,
                     filter=filters if filters else None
                 )
-                
+
                 results = []
+                logger.info(f"Semantic search found {len(search_response.matches)} matches in namespace 'reckon-knowledge-base'")
                 for match in search_response.matches:
                     # Get chunk text from metadata or fetch from database if needed
                     chunk_text = self._get_chunk_text_from_match(match)
