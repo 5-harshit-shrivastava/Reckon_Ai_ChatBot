@@ -10,8 +10,9 @@ backend_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if backend_dir not in sys.path:
     sys.path.insert(0, backend_dir)
 
-# Load environment variables
-load_dotenv()
+# Load environment variables from backend/.env file
+env_path = os.path.join(backend_dir, '.env')
+load_dotenv(dotenv_path=env_path, override=True)
 
 # Try to import routes, but handle import errors gracefully for minimal deployment
 try:

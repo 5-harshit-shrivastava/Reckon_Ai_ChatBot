@@ -198,21 +198,26 @@ class VectorSearchService:
                     # Create embedding for the chunk text (as passage)
                     embedding = self.create_embedding(chunk.chunk_text, is_query=False)
                     
+                    # Get document info once for efficiency
+                    doc_industry = self._get_document_industry(db, chunk.document_id)
+                    doc_type = self._get_document_type(db, chunk.document_id)
+                    doc_language = self._get_document_language(db, chunk.document_id)
+                    
                     # Prepare vector for Pinecone upsert
                     vector = {
                         "id": f"chunk_{chunk.id}",
                         "values": embedding,
                         "metadata": {
-                            "chunk_id": chunk.id,
-                            "document_id": chunk.document_id,
-                            "chunk_index": chunk.chunk_index,
-                            "section_title": chunk.section_title or "",
-                            "keywords": chunk.keywords or "",
-                            "confidence_score": chunk.confidence_score or 0.5,
-                            "industry_type": self._get_document_industry(db, chunk.document_id),
-                            "document_type": self._get_document_type(db, chunk.document_id),
-                            "language": self._get_document_language(db, chunk.document_id),
-                            "chunk_text": chunk.chunk_text  # Store text in metadata
+                            "chunk_id": int(chunk.id),  # Ensure integer
+                            "document_id": int(chunk.document_id),  # Ensure integer
+                            "chunk_index": int(chunk.chunk_index),
+                            "section_title": str(chunk.section_title or ""),
+                            "keywords": str(chunk.keywords or ""),
+                            "confidence_score": float(chunk.confidence_score or 0.5),
+                            "industry_type": str(doc_industry),
+                            "document_type": str(doc_type),
+                            "language": str(doc_language),
+                            "chunk_text": str(chunk.chunk_text)  # Store text in metadata
                         }
                     }
                     
@@ -290,9 +295,19 @@ class VectorSearchService:
                     # Get chunk text from metadata or fetch from database if needed
                     chunk_text = self._get_chunk_text_from_match(match)
                     
+                    # Convert IDs from float to int (Pinecone stores as float)
+                    chunk_id = match.metadata.get("chunk_id")
+                    document_id = match.metadata.get("document_id")
+                    
+                    # Ensure IDs are integers
+                    if chunk_id is not None:
+                        chunk_id = int(chunk_id)
+                    if document_id is not None:
+                        document_id = int(document_id)
+                    
                     result = {
-                        "chunk_id": match.metadata.get("chunk_id"),
-                        "document_id": match.metadata.get("document_id"),
+                        "chunk_id": chunk_id,
+                        "document_id": document_id,
                         "similarity_score": float(match.score),
                         "chunk_text": chunk_text,
                         "section_title": match.metadata.get("section_title"),
@@ -581,7 +596,7 @@ class VectorSearchService:
             # Prepare vector IDs to delete
             vector_ids = []
             for chunk in chunks:
-                vector_id = f"doc_{document_id}_chunk_{chunk.id}"
+                vector_id = f"chunk_{chunk.id}"  # Match the format used in store_chunk_embeddings
                 vector_ids.append(vector_id)
 
             # Delete vectors from Pinecone in batches
@@ -620,7 +635,7 @@ class VectorSearchService:
                 logger.error("Pinecone index not available for deletion")
                 return False
 
-            vector_id = f"doc_{document_id}_chunk_{chunk_id}"
+            vector_id = f"chunk_{chunk_id}"  # Match the format used in store_chunk_embeddings
 
             self.pinecone_index.delete(ids=[vector_id])
             logger.info(f"Successfully deleted vector {vector_id} from Pinecone")
