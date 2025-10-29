@@ -345,9 +345,13 @@ const ChatPage: React.FC = () => {
       });
 
       setTimeout(() => {
+        // Use the real API response, log for debugging
+        console.log('API Response:', response);
+        const apiResponse = response.assistant_response?.message_text || response.response || response.answer;
+        
         const assistantMessage: Message = {
           id: uuidv4(),
-          content: response.assistant_response?.message_text || generateMockResponse(content),
+          content: apiResponse || `API Error: No response received. Response object: ${JSON.stringify(response)}`,
           sender: 'assistant',
           timestamp: new Date(),
           type: 'text',
@@ -363,17 +367,17 @@ const ChatPage: React.FC = () => {
       console.error('Error sending message:', error);
       console.log('API Error Details:', ChatApiService.handleApiError(error));
 
-      // Fallback to mock response
+      // Show the actual error instead of fallback
       setTimeout(() => {
         const assistantMessage: Message = {
           id: uuidv4(),
-          content: generateMockResponse(content),
+          content: `API Error: ${error instanceof Error ? error.message : 'Unknown error'}. Please check console for details.`,
           sender: 'assistant',
           timestamp: new Date(),
           type: 'text',
-          confidence: Math.floor(Math.random() * 11) + 90, // 90-100% confidence
-          responseTime: Math.floor(Math.random() * 100) + 80, // 80-180ms response time
-          status: 'delivered',
+          confidence: 0, // Low confidence for error
+          responseTime: 0,
+          status: 'error',
         };
 
         setMessages(prev => [...prev, assistantMessage]);
