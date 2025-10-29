@@ -72,8 +72,28 @@ class GeminiService:
             # Combine prompts
             full_prompt = f"{system_prompt}\n\n{user_prompt}"
 
-            # Generate response
+            # Generate response with relaxed safety settings for business content
             start_time = time.time()
+
+            # Configure safety settings for business/commercial content
+            safety_settings = [
+                {
+                    "category": "HARM_CATEGORY_HARASSMENT",
+                    "threshold": "BLOCK_MEDIUM_AND_ABOVE"
+                },
+                {
+                    "category": "HARM_CATEGORY_HATE_SPEECH", 
+                    "threshold": "BLOCK_MEDIUM_AND_ABOVE"
+                },
+                {
+                    "category": "HARM_CATEGORY_SEXUALLY_EXPLICIT",
+                    "threshold": "BLOCK_MEDIUM_AND_ABOVE"
+                },
+                {
+                    "category": "HARM_CATEGORY_DANGEROUS_CONTENT",
+                    "threshold": "BLOCK_MEDIUM_AND_ABOVE"
+                }
+            ]
 
             response = self.client.generate_content(
                 full_prompt,
@@ -82,7 +102,8 @@ class GeminiService:
                     max_output_tokens=800,
                     top_p=0.9,
                     top_k=40
-                )
+                ),
+                safety_settings=safety_settings
             )
 
             generation_time = int((time.time() - start_time) * 1000)
@@ -103,9 +124,23 @@ class GeminiService:
                     "generation_time_ms": generation_time
                 }
             else:
+                # Check if response was blocked by safety filters
+                if response and hasattr(response, 'candidates') and response.candidates:
+                    candidate = response.candidates[0]
+                    if hasattr(candidate, 'finish_reason'):
+                        if candidate.finish_reason == 2:  # SAFETY
+                            logger.warning("Response blocked by Gemini safety filters")
+                            return {
+                                "success": False,
+                                "response": "I understand you're asking about business topics. Let me provide a helpful response about Reckon services instead.",
+                                "confidence": 0.5,
+                                "model_used": self.model_name,
+                                "safety_blocked": True
+                            }
+                
                 return {
                     "success": False,
-                    "response": "No response generated",
+                    "response": "I'm unable to generate a response right now. Please try rephrasing your question.",
                     "confidence": 0.0,
                     "model_used": self.model_name
                 }
