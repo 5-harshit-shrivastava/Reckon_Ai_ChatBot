@@ -377,7 +377,7 @@ const ChatPage: React.FC = () => {
           type: 'text',
           confidence: 0, // Low confidence for error
           responseTime: 0,
-          status: 'error',
+          status: 'failed',
         };
 
         setMessages(prev => [...prev, assistantMessage]);
