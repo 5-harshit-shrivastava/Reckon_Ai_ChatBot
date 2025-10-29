@@ -347,16 +347,16 @@ const ChatPage: React.FC = () => {
       setTimeout(() => {
         // Use the real API response, log for debugging
         console.log('API Response:', response);
-        const apiResponse = response.assistant_response?.message_text || response.response || response.answer;
+        const apiResponse = response.assistant_response?.message_text || response.response;
         
         const assistantMessage: Message = {
           id: uuidv4(),
-          content: apiResponse || `API Error: No response received. Response object: ${JSON.stringify(response)}`,
+          content: apiResponse || `API Error: No response received. Response: ${JSON.stringify(response)}`,
           sender: 'assistant',
           timestamp: new Date(),
           type: 'text',
-          confidence: Math.floor(Math.random() * 11) + 90, // 90-100% confidence
-          responseTime: Math.floor(Math.random() * 100) + 80, // 80-180ms response time
+          confidence: response.confidence ? Math.round(response.confidence * 100) : 90,
+          responseTime: response.processing_time_ms || 100,
           status: 'delivered',
         };
 

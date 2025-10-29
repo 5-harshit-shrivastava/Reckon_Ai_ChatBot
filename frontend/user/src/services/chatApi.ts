@@ -39,6 +39,13 @@ export interface SendMessageResponse {
   user_message: ChatMessage;
   assistant_response?: ChatMessage;
   session_info: ChatSession;
+  // RAG service response fields
+  response?: string;
+  confidence?: number;
+  sources?: any[];
+  processing_time_ms?: number;
+  chunks_used?: number;
+  model_used?: string;
 }
 
 export interface ChatSession {
