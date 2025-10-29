@@ -93,7 +93,12 @@ async def debug():
         "import_error": import_error_message if not routes_available else None,
         "python_path": sys.path[:3],  # Show first 3 paths
         "working_directory": os.getcwd(),
-        "backend_dir": backend_dir
+        "backend_dir": backend_dir,
+        "env_vars_available": {
+            "GEMINI_API_KEY": "SET" if os.getenv("GEMINI_API_KEY") else "NOT SET",
+            "PINECONE_API_KEY": "SET" if os.getenv("PINECONE_API_KEY") else "NOT SET",
+            "HUGGINGFACE_API_TOKEN": "SET" if os.getenv("HUGGINGFACE_API_TOKEN") else "NOT SET"
+        }
     }
 
 @app.options("/{path:path}")
