@@ -384,7 +384,7 @@ const ChatPage: React.FC = () => {
         setIsTyping(false);
       }, 1000 + Math.random() * 1000);
     }
-  }, [sessionId, flowStage, generateMockResponse]);
+  }, [sessionId, flowStage]);
 
   // Handle pending message when session is ready
   useEffect(() => {
