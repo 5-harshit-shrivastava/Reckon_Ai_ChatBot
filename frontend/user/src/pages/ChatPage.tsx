@@ -117,9 +117,6 @@ const ChatPage: React.FC = () => {
     initializeSession();
   }, [location.state?.initialMessage]);
 
-  // State to store user name for personalized responses
-  const [userName, setUserName] = useState<string | null>(null);
-
   // Create welcome + choice message combined
   const createWelcomeMessage = (): Message => {
     return {
@@ -132,60 +129,6 @@ const ChatPage: React.FC = () => {
       responseTime: 0,
       status: 'delivered',
     };
-  };
-
-  const extractUserName = (message: string): string | null => {
-    const lowerMessage = message.toLowerCase();
-    const patterns = [
-      "my name is ",
-      "i am ",
-      "call me ",
-      "i'm "
-    ];
-
-    for (const pattern of patterns) {
-      if (lowerMessage.includes(pattern)) {
-        const startIndex = lowerMessage.indexOf(pattern) + pattern.length;
-        const namePart = message.substring(startIndex).trim();
-
-        // Extract first word/name
-        const nameMatch = namePart.match(/^([a-zA-Z][\w\s\-']*?)(?:\s|[.!?]|$)/);
-        if (nameMatch) {
-          const extractedName = nameMatch[1].trim();
-          // Clean up common trailing words
-          const stopWords = ["and", "but", "from", "here", "there"];
-          const words = extractedName.split(' ');
-          if (words.length > 0 && !stopWords.includes(words[words.length - 1].toLowerCase())) {
-            return extractedName.split(' ')[0]; // Take first word as name
-          }
-        }
-      }
-    }
-    return null;
-  };
-
-  const detectIntent = (message: string): string => {
-    const lowerMessage = message.toLowerCase();
-
-    if (lowerMessage.includes('my name is') || lowerMessage.includes('i am') || lowerMessage.includes('call me')) {
-      return 'name_introduction';
-    }
-    if (['hello', 'hi', 'hey', 'good morning', 'good evening'].some(word => lowerMessage.includes(word))) {
-      return 'greeting';
-    }
-    if (['erp', 'advantage'].some(word => lowerMessage.includes(word))) {
-      return 'erp_query';
-    }
-    if (['gst', 'tax'].some(word => lowerMessage.includes(word))) {
-      return 'gst_query';
-    }
-    if (['inventory', 'stock'].some(word => lowerMessage.includes(word))) {
-      return 'inventory_query';
-    }
-    if (['billing', 'invoice'].some(word => lowerMessage.includes(word))) {
-      return 'billing_query';
-    }
-    return 'general_query';
   };
 
   // Simple validators
