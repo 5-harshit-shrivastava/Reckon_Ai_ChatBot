@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+// CACHE BUST - FORCE REDEPLOY v0.1.2 - 2025-10-30
 import { Box, Paper } from '@mui/material';
 import { useLocation } from 'react-router-dom';
 import { Layout, ChatInterface, Message, colors } from '../shared';
