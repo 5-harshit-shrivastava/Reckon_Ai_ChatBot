@@ -1,0 +1,4 @@
+FORCE REDEPLOY - 2025-10-30 - HARDCODE API URL FIX
+This file forces Vercel to completely rebuild and ignore all caches.
+Timestamp: 2025-10-30 14:30:00
+Build ID: emergency-api-fix-v2

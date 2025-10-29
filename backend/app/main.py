@@ -47,8 +47,6 @@ app = FastAPI(
 allowed_origins = [
     "http://localhost:3000",
     "http://localhost:3001", 
-    "https://reckonuser-63oqv2oie-5-harshit-shrivastavas-projects.vercel.app",
-    "https://reckonuser-5kldfld7g-5-harshit-shrivastavas-projects.vercel.app",
     "https://reckonadmin-wine.vercel.app",
     "https://bckreckon.vercel.app"
 ]
@@ -56,6 +54,7 @@ allowed_origins = [
 app.add_middleware(
     CORSMiddleware,
     allow_origins=allowed_origins,
+    allow_origin_regex=r"https://reckonuser-.*\.vercel\.app",
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "HEAD"],
     allow_headers=["*"],
