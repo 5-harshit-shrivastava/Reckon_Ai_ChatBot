@@ -31,14 +31,13 @@ class RAGService:
             self.gemini_service = GeminiService()
             logger.info("Google Gemini Pro service initialized for RAG")
 
-            # Test connection
-            if self.gemini_service.test_connection():
-                logger.info("Gemini Pro connection test successful")
-            else:
-                logger.error("Gemini Pro connection test failed")
+            # Skip connection test during initialization to avoid blocking
+            # The actual API calls will handle errors gracefully
+            logger.info("Gemini service ready - skipping connection test during init")
 
         except Exception as e:
             logger.error(f"Error initializing Gemini service: {e}")
+            self.gemini_service = None
     
     def generate_rag_response(
         self,
@@ -243,16 +242,26 @@ class RAGService:
         """Generate response using Google Gemini Pro with ReckonSales context"""
 
         # Use Google Gemini Pro exclusively
-        if self.gemini_service and self.gemini_service.client:
-            return self._generate_gemini_response(user_query, context, industry_context, language, session_id)
+        if self.gemini_service:
+            # Try to generate response - error handling is inside gemini_service
+            response = self._generate_gemini_response(user_query, context, industry_context, language, session_id)
+            
+            # If Gemini response was successful, return it
+            if response.get("success", False):
+                return response
+            
+            # If Gemini failed, log the error and return the error response
+            logger.error(f"Gemini response failed: {response.get('error', 'Unknown error')}")
+            return response
 
-        # If Gemini is not available, return error
+        # If Gemini service is not initialized
         else:
             return {
                 "success": False,
-                "response": "Google Gemini Pro service is not available. Please check your API key.",
+                "response": "AI service is not available. Please try again later.",
                 "confidence": 0.0,
-                "model_used": "none"
+                "model_used": "none",
+                "error": "Gemini service not initialized"
             }
 
     def _generate_gemini_response(
