@@ -1,0 +1,2 @@
+# Force fresh deployment - Fix search relevance
+DEPLOYMENT_VERSION=2.0.3
