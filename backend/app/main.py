@@ -48,6 +48,7 @@ allowed_origins = [
     "http://localhost:3000",
     "http://localhost:3001", 
     "https://reckonuser-63oqv2oie-5-harshit-shrivastavas-projects.vercel.app",
+    "https://reckonuser-5kldfld7g-5-harshit-shrivastavas-projects.vercel.app",
     "https://reckonadmin-wine.vercel.app",
     "https://bckreckon.vercel.app"
 ]
