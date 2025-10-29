@@ -1,10 +1,14 @@
 import axios from 'axios';
 
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'https://bckreckon.vercel.app';
+// FORCE PRODUCTION API URL - NO LOCALHOST
+const PRODUCTION_API_URL = 'https://bckreckon.vercel.app';
+const API_BASE_URL = process.env.REACT_APP_API_URL || PRODUCTION_API_URL;
 
 // Debug: Log the API URL being used
 console.log('🔗 API_BASE_URL:', API_BASE_URL);
 console.log('🔗 REACT_APP_API_URL env var:', process.env.REACT_APP_API_URL);
+console.log('🔗 PRODUCTION_API_URL fallback:', PRODUCTION_API_URL);
+console.log('🔗 ALL ENV VARS:', process.env);
 
 // Create axios instance with default config
 const api = axios.create({
