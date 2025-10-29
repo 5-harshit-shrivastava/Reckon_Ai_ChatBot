@@ -188,45 +188,6 @@ const ChatPage: React.FC = () => {
     return 'general_query';
   };
 
-  const generateMockResponse = useCallback((userMessage: string): string => {
-    const intent = detectIntent(userMessage);
-
-    // Handle name introduction
-    if (intent === 'name_introduction') {
-      const extractedName = extractUserName(userMessage);
-      if (extractedName) {
-        setUserName(extractedName);
-        return `Nice to meet you, ${extractedName}! I'm Rico, your Reckon AI assistant. How can I help you today?`;
-      } else {
-        return `Nice to meet you! I'm Rico, your Reckon AI assistant. How can I help you today?`;
-      }
-    }
-
-    // Handle greetings with personalization
-    if (intent === 'greeting') {
-      return `Hello${userName ? ' ' + userName : ''}! I'm Rico, your Reckon AI assistant. How can I help you today?`;
-    }
-
-    // Handle other intents
-    if (intent === 'erp_query') {
-      return `Great question about ERP advantages! Reckon ERP offers:\n\n• Integrated billing and inventory management\n• Real-time GST compliance\n• Multi-location support\n• Automated financial reporting\n• Cloud-based accessibility\n\nWould you like me to explain any specific feature in detail?`;
-    }
-
-    if (intent === 'gst_query') {
-      return `For GST compliance, Reckon helps with:\n\n• Automatic GST calculation\n• GSTR-1, GSTR-3B filing\n• Input tax credit management\n• E-way bill generation\n• Compliance reports\n\nDo you need help with a specific GST return or compliance issue?`;
-    }
-
-    if (intent === 'inventory_query') {
-      return `Reckon's inventory management includes:\n\n• Real-time stock tracking\n• Low stock alerts\n• Batch and serial number tracking\n• Multi-warehouse management\n• Purchase and sales integration\n\nWhat specific inventory challenge are you facing?`;
-    }
-
-    if (intent === 'billing_query') {
-      return `Our billing system offers:\n\n• Professional invoice templates\n• Automatic tax calculations\n• Payment tracking\n• Recurring billing setup\n• Integration with payment gateways\n\nHow can I help with your billing requirements?`;
-    }
-
-    return `Thank you for your question about "${userMessage}". I'm here to help with all Reckon-related queries. Could you provide more specific details so I can give you the most relevant assistance?\n\nI can help with:\n• Billing and invoicing\n• GST compliance\n• Inventory management\n• Multi-branch operations\n• Technical support`;
-  }, [userName]);
-
   // Simple validators
   const isValidLicense = (value: string) => /^[0-9]{5,}$/.test(value.trim());
   const isValidMobile = (value: string) => /^[0-9]{10}$/.test(value.trim());
