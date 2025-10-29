@@ -44,12 +44,19 @@ app = FastAPI(
 )
 
 # Configure CORS for production deployment
+allowed_origins = [
+    "http://localhost:3000",
+    "http://localhost:3001", 
+    "https://reckonuser-63oqv2oie-5-harshit-shrivastavas-projects.vercel.app",
+    "https://reckonadmin-wine.vercel.app",
+    "https://bckreckon.vercel.app"
+]
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origin_regex=r"https://.*\.vercel\.app|http://localhost:\d+",
+    allow_origins=allowed_origins + ["*"],  # Allow all origins temporarily for debugging
     allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "HEAD"],
     allow_headers=["*"],
 )
 
@@ -88,6 +95,11 @@ async def debug():
         "working_directory": os.getcwd(),
         "backend_dir": backend_dir
     }
+
+@app.options("/{path:path}")
+async def options_handler(path: str):
+    """Handle CORS preflight requests"""
+    return {"message": "OK"}
 
 # Include routers only if they were successfully imported
 if routes_available:
