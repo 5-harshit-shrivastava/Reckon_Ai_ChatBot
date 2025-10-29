@@ -115,7 +115,7 @@ const ChatPage: React.FC = () => {
     };
 
     initializeSession();
-  }, []);
+  }, [location.state?.initialMessage]);
 
   // State to store user name for personalized responses
   const [userName, setUserName] = useState<string | null>(null);
@@ -380,7 +380,7 @@ const ChatPage: React.FC = () => {
         setIsTyping(false);
       }, 1000 + Math.random() * 1000);
     }
-  }, [sessionId, generateMockResponse]);
+  }, [sessionId, flowStage, generateMockResponse]);
 
   // Handle pending message when session is ready
   useEffect(() => {

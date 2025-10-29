@@ -177,23 +177,23 @@ class DocumentProcessor:
         
         return overlap_text
     
-    def _extract_section_title(self, text: str) -> Optional[str]:
+    def _extract_section_title(self, text: str) -> str:
         """
         Try to extract a section title from the chunk text
         """
         lines = text.split('\n')
         first_line = lines[0].strip()
-        
+
         # Check if first line looks like a title (short, has keywords)
         if len(first_line) < 100 and any(marker in first_line.lower() for marker in self.section_markers):
             return first_line
-        
+
         # Look for numbered steps or procedures
         step_match = re.match(r'^(step\s+\d+|procedure\s+\d+|\d+\.\s*)', first_line, re.IGNORECASE)
         if step_match:
             return first_line
-        
-        return None
+
+        return ''
     
     def _post_process_chunks(self, chunks: List[Dict]) -> List[Dict]:
         """
@@ -210,7 +210,8 @@ class DocumentProcessor:
             
             processed_chunk = {
                 **chunk,
-                'keywords': ', '.join(keywords) if keywords else None,
+                'keywords': ', '.join(keywords) if keywords else '',
+                'section_title': chunk.get('section_title', ''),
                 'confidence_score': confidence,
                 'overlap_with_previous': 0  # Will be set when saving to DB
             }

@@ -15,22 +15,32 @@ env_path = os.path.join(backend_dir, '.env')
 load_dotenv(dotenv_path=env_path, override=True)
 
 # Try to import routes, but handle import errors gracefully for minimal deployment
+import traceback
+routes_available = False
+import_error_message = ""
+
 try:
-    from routes.users import router as users_router
-    from routes.chat_sessions import router as chat_sessions_router
-    from routes.chat_messages import router as chat_messages_router
-    from routes.knowledge_base import router as knowledge_router
-    from routes.admin import router as admin_router
+    # Using Pinecone-only routes (no PostgreSQL/Neon database)
+    from routes.knowledge_base_pinecone import router as knowledge_router
+    from routes.admin_pinecone import router as admin_router
+    from routes.chat_simple import router as chat_router
+    from routes.admin_utils import router as admin_utils_router
     routes_available = True
+    print("✅ Routes imported successfully")
 except ImportError as e:
-    print(f"Warning: Could not import all routes: {e}")
-    routes_available = False
+    import_error_message = f"Import error: {str(e)}"
+    print(f"❌ Warning: Could not import all routes: {e}")
+    traceback.print_exc()
+except Exception as e:
+    import_error_message = f"Unexpected error: {str(e)}"
+    print(f"❌ Unexpected error importing routes: {e}")
+    traceback.print_exc()
 
 # Create FastAPI instance
 app = FastAPI(
     title="Reckon ChatBot API",
-    description="RAG-based chatbot API for ReckonSales ERP platform",
-    version="1.0.0"
+    description="RAG-based chatbot API - Pinecone Only",
+    version="2.0.2"
 )
 
 # Configure CORS for production deployment
@@ -47,8 +57,8 @@ app.add_middleware(
 async def root():
     """Root endpoint"""
     return {
-        "message": "Welcome to Reckon ChatBot API",
-        "version": "1.0.0",
+        "message": "Welcome to Reckon ChatBot API v2",
+        "version": "2.0.2",
         "status": "active"
     }
 
@@ -57,8 +67,9 @@ async def health_check():
     """Health check endpoint"""
     return {
         "status": "healthy",
-        "message": "Reckon ChatBot API is running",
-        "version": "1.0.0"
+        "message": "Reckon ChatBot API is running - Pinecone Only",
+        "version": "2.0.0",
+        "storage": "pinecone_only"
     }
 
 @app.get("/ping")
@@ -72,6 +83,7 @@ async def debug():
     return {
         "status": "deployed",
         "routes_available": routes_available,
+        "import_error": import_error_message if not routes_available else None,
         "python_path": sys.path[:3],  # Show first 3 paths
         "working_directory": os.getcwd(),
         "backend_dir": backend_dir
@@ -79,11 +91,10 @@ async def debug():
 
 # Include routers only if they were successfully imported
 if routes_available:
-    app.include_router(users_router)
-    app.include_router(chat_sessions_router)
-    app.include_router(chat_messages_router)
     app.include_router(knowledge_router)
     app.include_router(admin_router)
+    app.include_router(chat_router)
+    app.include_router(admin_utils_router)
 
 # For Vercel deployment
 app_handler = app

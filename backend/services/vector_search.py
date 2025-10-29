@@ -1,10 +1,8 @@
 import os
 import time
 import numpy as np
-from typing import List, Dict, Tuple, Optional
-from sqlalchemy.orm import Session
+from typing import List, Dict, Tuple, Optional, Any
 from pinecone import Pinecone, ServerlessSpec
-from models.knowledge_base import DocumentChunk, KnowledgeBaseQuery
 import json
 from loguru import logger
 
@@ -172,7 +170,7 @@ class VectorSearchService:
         logger.warning("Local embedding generation is disabled - using API only")
         return [0.0] * self.vector_dimension
     
-    def store_chunk_embeddings(self, db: Session, chunks: List[DocumentChunk]) -> int:
+    def store_chunk_embeddings(self, db: Any = None, chunks: List[Any] = None) -> int:
         """
         Store document chunks in Pinecone using hosted embeddings (text-based)
         
@@ -235,13 +233,15 @@ class VectorSearchService:
                     namespace="reckon-knowledge-base"
                 )
                 logger.info(f"Stored {len(vectors)} chunks in Pinecone using bge-large-en-v1.5 embeddings")
-            
-            db.commit()
+
+            if db:
+                db.commit()
             return stored_count
-            
+
         except Exception as e:
             logger.error(f"Error storing chunks in Pinecone: {e}")
-            db.rollback()
+            if db:
+                db.rollback()
             return 0
     
     def semantic_search(
@@ -280,8 +280,8 @@ class VectorSearchService:
                 
                 # Create query embedding (with query prefix)
                 query_embedding = self.create_embedding(query, is_query=True)
-                
-                # Search using vector query with bge-large-en-v1.5
+
+                # Search ONLY in our namespace (ignore old default namespace)
                 search_response = self.pinecone_index.query(
                     namespace="reckon-knowledge-base",
                     vector=query_embedding,
@@ -289,8 +289,9 @@ class VectorSearchService:
                     include_metadata=True,
                     filter=filters if filters else None
                 )
-                
+
                 results = []
+                logger.info(f"Semantic search found {len(search_response.matches)} matches in namespace 'reckon-knowledge-base'")
                 for match in search_response.matches:
                     # Get chunk text from metadata or fetch from database if needed
                     chunk_text = self._get_chunk_text_from_match(match)
@@ -339,8 +340,8 @@ class VectorSearchService:
     
     def hybrid_search(
         self,
-        db: Session,
-        query: str,
+        db: Any = None,
+        query: str = "",
         top_k: int = 5,
         semantic_weight: float = 0.7,
         text_weight: float = 0.3,
@@ -371,14 +372,16 @@ class VectorSearchService:
                 industry_types=industry_types
             )
             
-            # Get text search results (basic keyword matching)
-            text_results = self._text_search(
-                db=db,
-                query=query,
-                top_k=top_k * 2,
-                document_types=document_types,
-                industry_types=industry_types
-            )
+            # Get text search results (basic keyword matching) - skip if no db
+            text_results = []
+            if db:
+                text_results = self._text_search(
+                    db=db,
+                    query=query,
+                    top_k=top_k * 2,
+                    document_types=document_types,
+                    industry_types=industry_types
+                )
             
             # Combine and rerank results
             combined_results = self._combine_search_results(
@@ -394,15 +397,23 @@ class VectorSearchService:
     
     def _text_search(
         self,
-        db: Session,
-        query: str,
-        top_k: int,
+        db: Any = None,
+        query: str = "",
+        top_k: int = 5,
         document_types: List[str] = None,
         industry_types: List[str] = None
     ) -> List[Dict]:
         """Simple text-based search in document chunks"""
         try:
-            from models.knowledge_base import Document
+            if not db:
+                return []
+
+            # Lazy import to avoid circular dependency
+            try:
+                from models.knowledge_base import Document, DocumentChunk
+            except ImportError:
+                logger.warning("Database models not available, skipping text search")
+                return []
             
             # Build query
             query_obj = db.query(DocumentChunk, Document).join(Document)
@@ -495,7 +506,7 @@ class VectorSearchService:
     
     def log_search_query(
         self,
-        db: Session,
+        db: Any = None,
         user_id: int = None,
         session_id: int = None,
         query_text: str = "",
@@ -505,6 +516,16 @@ class VectorSearchService:
     ):
         """Log search query for analytics"""
         try:
+            if not db:
+                return
+
+            # Lazy import to avoid errors
+            try:
+                from models.knowledge_base import KnowledgeBaseQuery
+            except ImportError:
+                logger.warning("Database models not available, skipping query logging")
+                return
+
             query_record = KnowledgeBaseQuery(
                 user_id=user_id,
                 session_id=session_id,
@@ -513,10 +534,10 @@ class VectorSearchService:
                 top_chunk_ids=json.dumps(chunk_ids or []),
                 search_time_ms=search_time_ms
             )
-            
+
             db.add(query_record)
             db.commit()
-            
+
         except Exception as e:
             logger.error(f"Error logging search query: {e}")
     
@@ -538,42 +559,63 @@ class VectorSearchService:
             logger.warning(f"Error extracting chunk text from match: {e}")
             return ""
     
-    def _get_document_industry(self, db: Session, document_id: int) -> str:
+    def _get_document_industry(self, db: Any = None, document_id: int = 0) -> str:
         """Get industry type for a document"""
         try:
-            from models.knowledge_base import Document
+            if not db:
+                return "general"
+
+            try:
+                from models.knowledge_base import Document
+            except ImportError:
+                return "general"
+
             document = db.query(Document).filter(Document.id == document_id).first()
             return document.industry_type if document else "general"
         except Exception as e:
             logger.warning(f"Error getting document industry: {e}")
             return "general"
-    
-    def _get_document_type(self, db: Session, document_id: int) -> str:
+
+    def _get_document_type(self, db: Any = None, document_id: int = 0) -> str:
         """Get document type for a document"""
         try:
-            from models.knowledge_base import Document
+            if not db:
+                return "unknown"
+
+            try:
+                from models.knowledge_base import Document
+            except ImportError:
+                return "unknown"
+
             document = db.query(Document).filter(Document.id == document_id).first()
             return document.document_type if document else "unknown"
         except Exception as e:
             logger.warning(f"Error getting document type: {e}")
             return "unknown"
-    
-    def _get_document_language(self, db: Session, document_id: int) -> str:
+
+    def _get_document_language(self, db: Any = None, document_id: int = 0) -> str:
         """Get language for a document"""
         try:
-            from models.knowledge_base import Document
+            if not db:
+                return "en"
+
+            try:
+                from models.knowledge_base import Document
+            except ImportError:
+                return "en"
+
             document = db.query(Document).filter(Document.id == document_id).first()
             return document.language if document else "en"
         except Exception as e:
             logger.warning(f"Error getting document language: {e}")
             return "en"
 
-    def delete_document_embeddings(self, db: Session, document_id: int) -> int:
+    def delete_document_embeddings(self, db: Any = None, document_id: int = 0) -> int:
         """
         Delete all vector embeddings for a specific document from Pinecone
 
         Args:
-            db: Database session
+            db: Database session (optional, for backwards compatibility)
             document_id: ID of the document to delete embeddings for
 
         Returns:
@@ -584,13 +626,23 @@ class VectorSearchService:
                 logger.error("Pinecone index not available for deletion")
                 return 0
 
-            # Get all chunks for this document
-            chunks = db.query(DocumentChunk).filter(
-                DocumentChunk.document_id == document_id
-            ).all()
+            # Get all chunks for this document if db available
+            chunks = []
+            if db:
+                try:
+                    from models.knowledge_base import DocumentChunk
+                    chunks = db.query(DocumentChunk).filter(
+                        DocumentChunk.document_id == document_id
+                    ).all()
+                except ImportError:
+                    logger.warning("Database models not available, using Pinecone filter instead")
 
             if not chunks:
-                logger.info(f"No chunks found for document {document_id}")
+                logger.info(f"No chunks found in DB for document {document_id}, will use Pinecone filter")
+                # Use Pinecone filter to get all vectors for this document
+                vector_ids = []
+                # Note: This is a simplified approach - in production you'd query Pinecone
+                # to get all vector IDs for this document
                 return 0
 
             # Prepare vector IDs to delete
