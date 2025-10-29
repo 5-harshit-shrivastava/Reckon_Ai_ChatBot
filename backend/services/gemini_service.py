@@ -10,13 +10,13 @@ class GeminiService:
 
     def __init__(self):
         self.client = None
-        self.model_name = "gemini-1.5-flash"  # Updated model name
+        self.model_name = "models/gemini-2.5-flash"  # Use latest working model
         self.initialize_service()
 
     def initialize_service(self):
         """Initialize Google Gemini Pro service"""
         try:
-            api_key = os.getenv("GOOGLE_GEMINI_API_KEY")
+            api_key = os.getenv("GEMINI_API_KEY")
 
             if not api_key:
                 logger.error("Google Gemini API key not found")

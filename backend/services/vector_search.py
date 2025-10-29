@@ -296,15 +296,32 @@ class VectorSearchService:
                     # Get chunk text from metadata or fetch from database if needed
                     chunk_text = self._get_chunk_text_from_match(match)
                     
-                    # Convert IDs from float to int (Pinecone stores as float)
+                    # Get IDs from metadata and vector ID
                     chunk_id = match.metadata.get("chunk_id")
                     document_id = match.metadata.get("document_id")
                     
-                    # Ensure IDs are integers
+                    # If chunk_id is None, extract from vector ID (format: doc_{uuid}_chunk_{index})
+                    if chunk_id is None and match.id:
+                        try:
+                            # Extract chunk index from vector ID
+                            if "_chunk_" in match.id:
+                                chunk_index = match.id.split("_chunk_")[-1]
+                                chunk_id = f"{document_id}_chunk_{chunk_index}"
+                        except:
+                            chunk_id = match.id  # Fallback to vector ID
+                    
+                    # Convert IDs to appropriate format
                     if chunk_id is not None:
-                        chunk_id = int(chunk_id)
+                        try:
+                            chunk_id = int(float(chunk_id))  # Convert to int if numeric
+                        except (ValueError, TypeError):
+                            chunk_id = str(chunk_id)  # Keep as string if UUID/non-numeric
+                    
                     if document_id is not None:
-                        document_id = int(document_id)
+                        try:
+                            document_id = int(float(document_id))
+                        except (ValueError, TypeError):
+                            document_id = str(document_id)  # Keep as string if UUID
                     
                     result = {
                         "chunk_id": chunk_id,

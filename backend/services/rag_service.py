@@ -74,10 +74,25 @@ class RAGService:
                 user_id=user_id
             )
             
-            # Step 2: Build context from retrieved documents
+            # Step 2: Check if we have relevant documents
+            if not search_results:
+                logger.info(f"No relevant documents found for query: '{user_query}'")
+                return {
+                    "success": True,
+                    "response": "I don't have enough information about that topic in my knowledge base. Please ask about topics that are covered in my documents.",
+                    "confidence": 0.0,
+                    "sources": [],
+                    "processing_time_ms": int((time.time() - start_time) * 1000),
+                    "chunks_used": 0,
+                    "model_used": self.model_name,
+                    "industry_context": industry_context,
+                    "language": language
+                }
+            
+            # Step 3: Build context from retrieved documents
             context = self._build_context(search_results)
             
-            # Step 3: Generate response using GPT-4
+            # Step 4: Generate response using Gemini
             response_data = self._generate_response(
                 user_query=user_query,
                 context=context,
@@ -87,7 +102,7 @@ class RAGService:
                 db=db
             )
             
-            # Step 4: Log the query for analytics
+            # Step 5: Log the query for analytics
             processing_time = int((time.time() - start_time) * 1000)
             self._log_rag_query(
                 db=db,
@@ -132,7 +147,7 @@ class RAGService:
         user_id: int = None,
         top_k: int = 5
     ) -> List[Dict]:
-        """Retrieve relevant document chunks using vector search"""
+        """Retrieve relevant document chunks using vector search with strict relevance filtering"""
         try:
             # Determine document types and industry filters
             document_types = None
@@ -147,8 +162,28 @@ class RAGService:
                 industry_types=industry_types
             )
             
-            logger.info(f"Retrieved {len(search_results)} relevant chunks for query")
-            return search_results
+            # STRICT RELEVANCE FILTERING
+            # Filter out results with very low similarity scores
+            MIN_SIMILARITY_THRESHOLD = 0.55  # Lowered threshold to include relevant content
+            
+            filtered_results = []
+            for result in search_results:
+                similarity_score = result.get("similarity_score", 0.0)
+                
+                # Only include results with meaningful similarity
+                if similarity_score >= MIN_SIMILARITY_THRESHOLD:
+                    filtered_results.append(result)
+                    logger.info(f"Included result with similarity: {similarity_score:.3f} for query '{query}'")
+                else:
+                    logger.info(f"Filtered out low similarity result: {similarity_score:.3f} for query '{query}'")
+            
+            # If no results meet the threshold, return empty list
+            if not filtered_results:
+                logger.info(f"No relevant documents found for query '{query}' (all below {MIN_SIMILARITY_THRESHOLD} threshold)")
+                return []
+            
+            logger.info(f"Retrieved {len(filtered_results)} relevant chunks for query (filtered from {len(search_results)})")
+            return filtered_results
             
         except Exception as e:
             logger.error(f"Error retrieving documents: {e}")
