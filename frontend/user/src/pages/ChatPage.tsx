@@ -117,7 +117,7 @@ const ChatPage: React.FC = () => {
     initializeSession();
   }, [location.state?.initialMessage]);
 
-  // Create welcome + choice message combined
+  // Create welcome + choice message combined (updated)
   const createWelcomeMessage = (): Message => {
     return {
       id: uuidv4(),
