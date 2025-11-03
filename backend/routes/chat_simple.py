@@ -172,11 +172,11 @@ async def analyze_uploaded_image(image: UploadFile = File(...)):
                 detail=f"Invalid file type. Expected image, got: {image.content_type}"
             )
         
-        # Check file size (limit to 10MB)
-        if image.size and image.size > 10 * 1024 * 1024:
+        # Check file size (limit to 5MB for Vercel compatibility)
+        if image.size and image.size > 5 * 1024 * 1024:
             raise HTTPException(
                 status_code=400,
-                detail="File too large. Maximum size is 10MB."
+                detail="File too large. Maximum size is 5MB."
             )
         
         logger.info(f"Analyzing uploaded image: {image.filename} ({image.content_type})")

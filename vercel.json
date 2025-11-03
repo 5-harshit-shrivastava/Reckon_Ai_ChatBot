@@ -19,5 +19,8 @@
     "backend/app/main.py": {
       "maxDuration": 30
     }
+  },
+  "limits": {
+    "duration": 30000
   }
 }

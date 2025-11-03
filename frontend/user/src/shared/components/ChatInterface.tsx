@@ -101,9 +101,9 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
       return;
     }
 
-    // Validate file size (10MB limit)
-    if (file.size > 10 * 1024 * 1024) {
-      alert('File size must be less than 10MB');
+    // Validate file size (5MB limit for Vercel compatibility)
+    if (file.size > 5 * 1024 * 1024) {
+      alert('File size must be less than 5MB');
       return;
     }
 
