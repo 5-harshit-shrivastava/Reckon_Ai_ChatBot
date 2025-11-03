@@ -90,29 +90,21 @@ class ImageAnalysisService:
         """Generate relevant questions from business document image"""
         
         prompt = """
-        You are a business analyst. Examine this document/screen carefully and generate 4-6 specific, actionable questions.
+        You are a business expert. Look at this document and generate 4-5 SHORT, SPECIFIC questions that a person would actually ask.
 
-        STEP 1: Identify what type of document this is:
-        - Invoice/Bill (amounts, due dates, vendor info)
-        - Purchase Order (items, quantities, suppliers)
-        - Software Screen (error messages, data entry, installation)
-        - Financial Report (calculations, totals, analysis)
-        - Inventory/Stock (product codes, quantities, warnings)
-
-        STEP 2: Create specific questions based on what you see:
-        - Reference actual numbers, dates, names visible in the image
-        - Ask about decisions that need to be made
-        - Focus on potential problems or verification needs
-        - Use business terminology for the document type
+        RULES:
+        1. Use exact numbers, names, and details you see
+        2. Make questions actionable and decision-focused
+        3. Keep each question under 20 words
+        4. Ask about real problems or next steps
 
         EXAMPLES:
-        For Purchase Orders: "Should we approve 40 units of ESOGARD at ₹141.43 each?"
-        For Error Screens: "How do we resolve the Database Engine recovery error?"
-        For Invoices: "Is the tax calculation of ₹200 correct on this ₹2000 total?"
-        For Stock Screens: "Why is item 200513 showing a stock warning?"
+        - "Should we approve supplier ABC's ₹50,000 invoice due tomorrow?"
+        - "How do we fix this database connection error?"
+        - "Why is item X showing negative stock?"
+        - "Is the 18% GST calculation correct here?"
 
-        Return 4-6 questions, one per line, without numbering.
-        Be specific to what you actually see in this image.
+        Generate 4-5 questions, one per line, no numbering.
         """
         
         try:
@@ -143,18 +135,14 @@ class ImageAnalysisService:
         """Extract key textual information from the image"""
         
         prompt = """
-        Extract the most important information from this business document/screen.
+        Extract key info from this document. List:
+        - Main amounts/numbers
+        - Company names  
+        - Product/item names
+        - Dates
+        - Any errors/warnings
 
-        Focus on:
-        - Important numbers (amounts, quantities, dates)
-        - Company/vendor names
-        - Product/item details
-        - Error messages or warnings
-        - Status information
-
-        Provide a brief summary of what this document shows and the key details visible.
-        Include specific numbers, names, and important facts.
-        Keep it concise but informative (2-3 sentences).
+        Keep it short - just the essential facts in 1-2 sentences.
         """
         
         try:
@@ -168,19 +156,11 @@ class ImageAnalysisService:
         """Identify the type of business document"""
         
         prompt = """
-        Look at this business document/screen and identify what it is.
+        Look at this document/screen. What type is it?
 
-        Common types:
-        - Invoice (billing document)
-        - Purchase Order (ordering items)
-        - Error Screen (system errors)
-        - Installation Screen (software setup)
-        - Stock Report (inventory levels)
-        - Financial Report (accounting data)
-        - Data Entry Form (input screens)
+        Options: Invoice, Purchase Order, Error Screen, Stock Report, Data Entry, Installation, Financial Report
 
-        Return only the specific document type you see (1-3 words).
-        Be precise about what you observe.
+        Answer in 1-2 words only.
         """
         
         try:
