@@ -120,7 +120,8 @@ class VectorSearchService:
             formatted_text = f"passage: {text}"
 
         # Call HuggingFace API
-        api_url = f"https://api-inference.huggingface.co/models/{model_name}"
+    # Use the HF Inference Router endpoint (newer path)
+    api_url = f"https://router.huggingface.co/hf-inference/{model_name}"
         headers = {
             "Authorization": f"Bearer {hf_token}",
             "Content-Type": "application/json"
@@ -134,16 +135,45 @@ class VectorSearchService:
         )
 
         if response.status_code == 200:
-            embedding = response.json()
+            body = response.json()
+
+            # The router endpoint may return different shapes depending on model and config.
+            # Try several common patterns to extract the raw vector.
+            embedding = None
+
+            # Case 1: API returns a plain list of floats
+            if isinstance(body, list) and all(isinstance(x, (int, float)) for x in body):
+                embedding = body
+
+            # Case 2: API returns a dict with 'embedding' key
+            elif isinstance(body, dict) and "embedding" in body and isinstance(body["embedding"], list):
+                embedding = body["embedding"]
+
+            # Case 3: Some HF routers return {'data': [{'embedding': [...]}, ...]}
+            elif isinstance(body, dict) and "data" in body:
+                try:
+                    first = body["data"][0]
+                    if isinstance(first, dict) and "embedding" in first:
+                        embedding = first["embedding"]
+                except Exception:
+                    embedding = None
+
+            if not embedding:
+                raise Exception(f"Unexpected embedding response shape: {body}")
+
             # Normalize the embedding
             import numpy as np
-            embedding = np.array(embedding)
+            embedding = np.array(embedding, dtype=float)
 
             # Ensure correct dimensions for bge-large-en-v1.5
             if len(embedding) != self.vector_dimension:
                 logger.warning(f"API returned {len(embedding)} dimensions, expected {self.vector_dimension}")
 
-            embedding = embedding / np.linalg.norm(embedding)
+            norm = np.linalg.norm(embedding)
+            if norm == 0 or np.isnan(norm):
+                raise Exception("Received zero or NaN embedding from HF API")
+
+            embedding = embedding / norm
             return embedding.tolist()
         else:
             raise Exception(f"API error: {response.status_code} - {response.text}")
