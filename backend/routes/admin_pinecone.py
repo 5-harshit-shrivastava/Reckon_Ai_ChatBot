@@ -297,19 +297,50 @@ async def update_knowledge_base_entry(
         raise HTTPException(status_code=500, detail=f"Error updating knowledge base entry: {str(e)}")
 
 
+@router.get("/debug/document-ids", response_model=Dict[str, Any])
+async def debug_document_ids():
+    """Debug endpoint to list all document IDs in Pinecone"""
+    try:
+        docs = pinecone_doc_service.list_documents(
+            limit=100,
+            filters={"is_active": True}
+        )
+        
+        doc_ids = [doc["id"] for doc in docs["documents"]]
+        
+        return {
+            "success": True,
+            "total_documents": len(doc_ids),
+            "document_ids": doc_ids,
+            "first_few_docs": docs["documents"][:3] if docs["documents"] else []
+        }
+    except Exception as e:
+        logger.error(f"Error listing document IDs: {e}")
+        return {
+            "success": False,
+            "error": str(e),
+            "document_ids": []
+        }
+
+
 @router.delete("/knowledge-base/{entry_id}", response_model=Dict[str, Any])
 async def delete_knowledge_base_entry(entry_id: str):
     """Delete a knowledge base entry from Pinecone (soft delete)"""
     try:
+        logger.info(f"Attempting to delete knowledge base entry: {entry_id}")
+        
         result = pinecone_doc_service.delete_document(
             document_id=entry_id,
             soft_delete=True  # Soft delete by default
         )
 
+        logger.info(f"Delete result for {entry_id}: {result}")
+
         if not result["success"]:
+            logger.warning(f"Document not found for deletion: {entry_id}")
             raise HTTPException(
                 status_code=404,
-                detail="Knowledge base entry not found"
+                detail=f"Knowledge base entry not found: {entry_id}"
             )
 
         return {
@@ -322,7 +353,7 @@ async def delete_knowledge_base_entry(entry_id: str):
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error deleting knowledge base entry: {e}")
+        logger.error(f"Error deleting knowledge base entry {entry_id}: {e}")
         raise HTTPException(status_code=500, detail=f"Error deleting knowledge base entry: {str(e)}")
 
 
