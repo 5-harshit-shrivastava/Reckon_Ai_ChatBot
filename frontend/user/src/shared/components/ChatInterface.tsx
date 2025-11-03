@@ -11,7 +11,6 @@ import {
 } from '@mui/material';
 import {
   Send as SendIcon,
-  AttachFile as AttachIcon,
   Mic as MicIcon,
   SmartToy as BotIcon,
   Person as PersonIcon,
@@ -26,6 +25,16 @@ export interface Message {
   confidence?: number;
   responseTime?: number;
   status?: 'delivered' | 'pending' | 'failed';
+  image?: {
+    file?: File;
+    preview: string;
+    suggestedQuestions?: string[];
+    documentInfo?: {
+      type: string;
+      filename: string;
+      key_information: string;
+    };
+  };
 }
 
 interface ChatInterfaceProps {
@@ -50,7 +59,11 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
   suggestionsMarquee = false,
 }) => {
   const [inputValue, setInputValue] = useState('');
+  const [selectedImage, setSelectedImage] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [isAnalyzingImage, setIsAnalyzingImage] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -76,6 +89,82 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
 
   const handleSuggestionClick = (suggestion: string) => {
     onSendMessage(suggestion);
+  };
+
+  const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      alert('Please select a valid image file');
+      return;
+    }
+
+    // Validate file size (10MB limit)
+    if (file.size > 10 * 1024 * 1024) {
+      alert('File size must be less than 10MB');
+      return;
+    }
+
+    // Create preview
+    const preview = URL.createObjectURL(file);
+    setImagePreview(preview);
+    setSelectedImage(file);
+    setIsAnalyzingImage(true);
+
+    try {
+      // Upload and analyze image
+      const formData = new FormData();
+      formData.append('image', file);
+
+      const response = await fetch(`${process.env.REACT_APP_API_URL || 'https://bckreckon.vercel.app'}/api/chat/analyze-image`, {
+        method: 'POST',
+        body: formData
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const result = await response.json();
+      
+      if (result.success) {
+        // Send the image upload info through the normal chat flow
+        onSendMessage(`[IMAGE_UPLOAD]${JSON.stringify({
+          filename: file.name,
+          type: result.document_info.type,
+          questions: result.questions,
+          keyInfo: result.document_info.key_information
+        })}`);
+        
+      } else {
+        console.error('Image analysis failed:', result.error);
+        alert('Failed to analyze image. Please try again.');
+      }
+    } catch (error) {
+      console.error('Error analyzing image:', error);
+      alert('Error uploading image. Please check your connection and try again.');
+    } finally {
+      setIsAnalyzingImage(false);
+      // Clear the file input
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  };
+
+  const handleImageButtonClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const clearImagePreview = () => {
+    if (imagePreview) {
+      URL.revokeObjectURL(imagePreview);
+    }
+    setImagePreview(null);
+    setSelectedImage(null);
+    setIsAnalyzingImage(false);
   };
 
   const getTimeAgo = (date: Date) => {
@@ -174,6 +263,36 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
               // User Message
               <Box sx={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'flex-start', gap: 2 }}>
                 <Box sx={{ maxWidth: '80%', display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
+                  {/* Image Preview if present */}
+                  {message.image && (
+                    <Box sx={{ mb: 1, borderRadius: 2, overflow: 'hidden', maxWidth: '300px' }}>
+                      <img 
+                        src={message.image.preview} 
+                        alt={message.image.documentInfo?.filename || "Uploaded document"}
+                        style={{
+                          width: '100%',
+                          height: 'auto',
+                          maxHeight: '200px',
+                          objectFit: 'cover',
+                          borderRadius: '8px',
+                          boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+                        }}
+                      />
+                      {message.image.documentInfo && (
+                        <Box sx={{ 
+                          p: 1, 
+                          bgcolor: 'rgba(66, 133, 244, 0.1)', 
+                          borderRadius: '0 0 8px 8px',
+                          border: '1px solid #e8eaed'
+                        }}>
+                          <Typography variant="caption" sx={{ color: '#5f6368', fontSize: '11px' }}>
+                            📄 {message.image.documentInfo.type} • {message.image.documentInfo.filename}
+                          </Typography>
+                        </Box>
+                      )}
+                    </Box>
+                  )}
+
                   <Paper
                     elevation={0}
                     sx={{
@@ -198,6 +317,67 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
                       {message.content}
                     </Typography>
                   </Paper>
+
+                  {/* Suggested Questions from Image */}
+                  {message.image?.suggestedQuestions && message.image.suggestedQuestions.length > 0 && (
+                    <Box sx={{ 
+                      width: '100%', 
+                      mt: 2, 
+                      mb: 1,
+                      p: 2,
+                      bgcolor: '#f8f9fa',
+                      borderRadius: 2,
+                      border: '1px solid #e8eaed'
+                    }}>
+                      <Typography variant="subtitle2" sx={{ 
+                        color: '#3c4043', 
+                        mb: 1.5,
+                        fontSize: '13px',
+                        fontWeight: 600,
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 1
+                      }}>
+                        💡 Questions from your document:
+                      </Typography>
+                      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                        {message.image.suggestedQuestions.map((question, index) => (
+                          <Chip
+                            key={index}
+                            label={question}
+                            onClick={() => handleSuggestionClick(question)}
+                            variant="outlined"
+                            sx={{
+                              justifyContent: 'flex-start',
+                              height: 'auto',
+                              py: 1,
+                              px: 1.5,
+                              borderColor: '#dadce0',
+                              color: '#3c4043',
+                              fontSize: '13px',
+                              fontWeight: 400,
+                              bgcolor: 'white',
+                              '&:hover': {
+                                bgcolor: '#f1f3f4',
+                                borderColor: '#4285f4',
+                                transform: 'translateX(-2px)',
+                                boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
+                              },
+                              transition: 'all 0.2s ease-in-out',
+                              cursor: 'pointer',
+                              textAlign: 'left',
+                              '& .MuiChip-label': {
+                                whiteSpace: 'normal',
+                                textAlign: 'left',
+                                paddingLeft: 0,
+                                paddingRight: 0
+                              }
+                            }}
+                          />
+                        ))}
+                      </Box>
+                    </Box>
+                  )}
 
                   {/* User Message Status */}
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, px: 1 }}>
@@ -379,16 +559,66 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
           zIndex: 10,
         }}
       >
+        {/* Image Preview Area */}
+        {imagePreview && (
+          <Box sx={{ 
+            mb: 2, 
+            p: 2, 
+            bgcolor: '#f8f9fa', 
+            borderRadius: 2, 
+            border: '1px solid #e8eaed',
+            position: 'relative'
+          }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+              <img 
+                src={imagePreview} 
+                alt="Preview" 
+                style={{
+                  width: '60px',
+                  height: '60px',
+                  objectFit: 'cover',
+                  borderRadius: '8px',
+                  border: '1px solid #dadce0'
+                }}
+              />
+              <Box sx={{ flex: 1 }}>
+                <Typography variant="body2" sx={{ color: '#3c4043', fontWeight: 500 }}>
+                  {selectedImage?.name}
+                </Typography>
+                <Typography variant="caption" sx={{ color: '#5f6368' }}>
+                  {selectedImage && `${(selectedImage.size / 1024 / 1024).toFixed(2)} MB`}
+                </Typography>
+                {isAnalyzingImage && (
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 1 }}>
+                    <CircularProgress size={16} />
+                    <Typography variant="caption" sx={{ color: '#4285f4' }}>
+                      Analyzing document...
+                    </Typography>
+                  </Box>
+                )}
+              </Box>
+              <IconButton 
+                onClick={clearImagePreview}
+                sx={{ color: '#5f6368', p: 0.5 }}
+                disabled={isAnalyzingImage}
+              >
+                ✕
+              </IconButton>
+            </Box>
+          </Box>
+        )}
+
         <Box sx={{ display: 'flex', gap: 1, alignItems: 'flex-end' }}>
           <TextField
             fullWidth
             multiline
             maxRows={4}
             variant="outlined"
-            placeholder={placeholder}
+            placeholder={isAnalyzingImage ? "Analyzing image..." : placeholder}
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
             onKeyDown={handleKeyPress}
+            disabled={isAnalyzingImage}
             sx={{
               '& .MuiOutlinedInput-root': {
                 borderRadius: 3,
@@ -407,7 +637,20 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
               },
             }}
           />
+          
+          {/* Hidden file input */}
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            onChange={handleImageUpload}
+            style={{ display: 'none' }}
+          />
+          
+          {/* Image Upload Button */}
           <IconButton
+            onClick={handleImageButtonClick}
+            disabled={isAnalyzingImage}
             sx={{
               color: '#5f6368',
               '&:hover': {
@@ -416,9 +659,11 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
               },
               p: 1.5,
             }}
+            title="Upload image document"
           >
-            <AttachIcon sx={{ fontSize: 20 }} />
+            📸
           </IconButton>
+          
           <IconButton
             sx={{
               color: '#5f6368',
@@ -433,12 +678,12 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
           </IconButton>
           <IconButton
             onClick={handleSend}
-            disabled={!inputValue.trim()}
+            disabled={!inputValue.trim() || isAnalyzingImage}
             sx={{
-              bgcolor: inputValue.trim() ? '#4285f4' : '#f1f3f4',
-              color: inputValue.trim() ? 'white' : '#9aa0a6',
+              bgcolor: inputValue.trim() && !isAnalyzingImage ? '#4285f4' : '#f1f3f4',
+              color: inputValue.trim() && !isAnalyzingImage ? 'white' : '#9aa0a6',
               '&:hover': {
-                bgcolor: inputValue.trim() ? '#3367d6' : '#f1f3f4',
+                bgcolor: inputValue.trim() && !isAnalyzingImage ? '#3367d6' : '#f1f3f4',
               },
               '&:disabled': {
                 bgcolor: '#f1f3f4',
@@ -463,7 +708,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
             textAlign: 'center',
           }}
         >
-          Press Enter to send, Shift+Enter for new line
+          Press Enter to send, Shift+Enter for new line • 📸 Upload business documents for instant questions
         </Typography>
       </Box>
     </Box>

@@ -70,6 +70,22 @@ tester/
 *RAG_IMPLEMENTATION.md
 *CONNECTION_SETUP.md
 
+# Test Files & Debug Scripts
+test_*.py
+test_*.html
+debug_*.py
+*_test.py
+quick_test.*
+sample_*.png
+sample_*.jpg
+create_sample_*
+
+# Development Artifacts
+*.debug
+*.temp
+*.tmp
+*_backup.*
+
 # OS
 .DS_Store
 Thumbs.db

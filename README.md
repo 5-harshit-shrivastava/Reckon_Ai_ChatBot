@@ -1,15 +1,25 @@
 <!-- kardia change -->
 # Reckon AI ChatBot
 
-A sophisticated RAG (Retrieval-Augmented Generation) chatbot system with separate user and admin interfaces, built with FastAPI backend and React frontends.
+A sophisticated RAG (Retrieval-Augmented Generation) chatbot system with **Image Upload & Analysis** capabilities, featuring separate user and admin interfaces, built with FastAPI backend and React frontends.
+
+## ✨ Key Features
+
+- 🤖 **AI-Powered Chat**: Advanced conversational AI with contextual responses
+- 📸 **Image Document Analysis**: Upload business documents (invoices, receipts, purchase orders) and get AI-generated questions
+- 🎯 **Smart Question Generation**: Context-aware questions based on document type and content
+- 👥 **Dual Interface**: Separate user and admin portals
+- 🔍 **RAG Technology**: Retrieval-Augmented Generation for accurate responses
+- 🌐 **Multi-language Support**: Supports multiple languages with multilingual embeddings
 
 ## 🏗️ Architecture
 
-- **Backend**: FastAPI with Python, integrated with AI/ML services
-- **User Frontend**: React TypeScript app for chat interactions
-- **Admin Frontend**: React TypeScript app for data management
+- **Backend**: FastAPI with Python, Google Gemini Vision API for image analysis
+- **User Frontend**: React TypeScript app for chat interactions and image uploads
+- **Admin Frontend**: React TypeScript app for data management and configuration
 - **Database**: SQLAlchemy with vector embeddings support
-- **AI Integration**: OpenAI, Langchain, Pinecone for RAG functionality
+- **AI Integration**: Google Gemini, Pinecone for RAG functionality, Gemini Vision for document analysis
+- **Document Processing**: PIL for image processing, intelligent document type recognition
 
 ## 🚀 Quick Start
 
