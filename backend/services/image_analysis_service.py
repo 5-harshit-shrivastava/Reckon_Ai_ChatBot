@@ -89,29 +89,19 @@ class ImageAnalysisService:
     async def _generate_questions_from_image(self, image: Image.Image, doc_type: str = "") -> List[str]:
         """Generate relevant questions from business document image"""
         
-        # Adjust prompt based on document type
+        # For error screens, extract exact error text
         if "error" in doc_type.lower():
             prompt = """
-            This is an error screen. Generate only 2 simple questions:
-            1. How to fix this error?
-            2. Who should handle this?
+            Extract the EXACT error message from this screen. 
             
-            Keep questions under 10 words each.
+            Copy the error text word-for-word exactly as shown.
+            Do not add any explanation or interpretation.
+            Just return the exact error message text.
             """
         else:
             prompt = """
-            Look at this document and generate ONLY relevant questions based on what you actually see.
-
-            If it's a simple error message: Generate 2-3 questions maximum
-            If it's a complex business document: Generate 3-4 questions maximum
-
-            Focus on:
-            - What actually needs to be done
-            - Who should handle it
-            - What's the impact
-
+            Look at this document and generate 2-3 relevant questions based on what you see.
             Keep questions under 12 words. Be specific to what you see.
-            Generate only as many questions as make sense for this document.
             """
         
         try:
@@ -126,7 +116,13 @@ class ImageAnalysisService:
                     "Who should handle this issue?"
                 ]
             
-            # Parse questions from response
+            # For error screens, return exact error text
+            if "error" in doc_type.lower():
+                # Extract exact error text
+                error_text = response.text.strip()
+                return [error_text] if error_text else ["Error message not readable"]
+            
+            # For other documents, parse as questions
             lines = response.text.strip().split('\n')
             questions = []
             
@@ -134,46 +130,36 @@ class ImageAnalysisService:
                 line = line.strip()
                 # Clean up common prefixes and ensure it's a question
                 line = line.lstrip('•-*123456789. ')
-                if line and '?' in line and len(line) > 10:  # Reduced for better responses
+                if line and '?' in line and len(line) > 10:
                     questions.append(line)
             
             # Return fallback questions based on document type
             if not questions:
-                if "error" in doc_type.lower():
-                    return [
-                        "How to fix this error?",
-                        "Who should handle this?"
-                    ]
-                else:
-                    return [
-                        "What needs to be done?",
-                        "Who should handle this?"
-                    ]
+                return [
+                    "What needs to be done?",
+                    "Who should handle this?"
+                ]
             
-            # Limit questions based on document type
-            max_questions = 2 if "error" in doc_type.lower() else 3
-            return questions[:max_questions]
+            # Limit to 3 questions maximum
+            return questions[:3]
             
         except Exception as e:
             logger.error(f"Error generating questions: {str(e)}")
-            # Return simple fallback questions
-            return [
-                "How to fix this error?",
-                "Who should handle this?"
-            ]
+            # Return simple fallback
+            if "error" in doc_type.lower():
+                return ["Error text could not be extracted"]
+            else:
+                return ["Document analysis failed"]
     
     async def _extract_key_information(self, image: Image.Image) -> str:
         """Extract key textual information from the image"""
         
         prompt = """
-        Extract key business information briefly:
-
-        What: [Document type]
-        Amount: [Key numbers]
-        Companies: [Names mentioned]
-        Issue: [Problem/status]
-
-        Format as single paragraph, maximum 30 words.
+        Extract all visible text from this image exactly as it appears.
+        
+        Read every line of text you can see.
+        Copy it word-for-word exactly.
+        Do not interpret or summarize.
         """
         
         try:
@@ -184,15 +170,12 @@ class ImageAnalysisService:
                 return "Business document - details not extractable"
             
             result = response.text.strip()
-            # Limit length and clean up
-            if len(result) > 100:
-                result = result[:100] + "..."
-            
-            return result if result else "Business document analysis"
+            # Return exact text, don't limit length for error extraction
+            return result if result else "Text not readable"
             
         except Exception as e:
             logger.error(f"Error extracting key information: {str(e)}")
-            return "Document analysis failed"
+            return "Text extraction failed"
     
     async def _analyze_document_type(self, image: Image.Image) -> str:
         """Identify the type of business document"""
