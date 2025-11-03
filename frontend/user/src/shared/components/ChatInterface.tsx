@@ -345,18 +345,43 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
                           <Box
                             key={index}
                             sx={{
-                              p: 2,
-                              borderRadius: 1,
-                              bgcolor: 'white',
-                              border: '1px solid #dadce0',
-                              fontSize: '13px',
-                              fontFamily: 'monospace',
-                              color: '#3c4043',
+                              p: 3,
+                              borderRadius: 2,
+                              bgcolor: '#fff',
+                              border: '2px solid #e3f2fd',
+                              fontSize: '14px',
+                              fontFamily: '"Segoe UI", Tahoma, Geneva, Verdana, sans-serif',
+                              color: '#1565c0',
                               whiteSpace: 'pre-line',
-                              lineHeight: 1.4
+                              lineHeight: 1.6,
+                              boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+                              '&:hover': {
+                                boxShadow: '0 4px 12px rgba(0,0,0,0.12)',
+                                transform: 'translateY(-1px)'
+                              },
+                              transition: 'all 0.2s ease'
                             }}
                           >
-                            {question}
+                            <Typography variant="body2" sx={{ 
+                              fontWeight: 600, 
+                              color: '#d32f2f', 
+                              mb: 1,
+                              fontSize: '12px',
+                              textTransform: 'uppercase',
+                              letterSpacing: '0.5px'
+                            }}>
+                              Error Message
+                            </Typography>
+                            <Box sx={{ 
+                              fontFamily: 'monospace',
+                              fontSize: '13px',
+                              bgcolor: '#f5f5f5',
+                              p: 2,
+                              borderRadius: 1,
+                              border: '1px solid #e0e0e0'
+                            }}>
+                              {question}
+                            </Box>
                           </Box>
                         ))}
                       </Box>

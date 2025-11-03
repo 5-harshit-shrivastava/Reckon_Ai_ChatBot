@@ -135,8 +135,13 @@ class ImageAnalysisService:
                     if line and len(line) > 3:  # Keep meaningful text
                         cleaned_lines.append(line)
                 
-                cleaned_error = '\n'.join(cleaned_lines)
-                return [cleaned_error] if cleaned_error else ["Error message not readable"]
+                # Format with proper spacing
+                if cleaned_lines:
+                    # Join lines with proper line breaks for better readability
+                    formatted_error = '\n\n'.join(cleaned_lines)
+                    return [formatted_error]
+                else:
+                    return ["Error message not readable"]
             
             # For other documents, parse as questions
             lines = response.text.strip().split('\n')
