@@ -323,6 +323,24 @@ async def debug_document_ids():
         }
 
 
+@router.get("/debug/document/{document_id}", response_model=Dict[str, Any])
+async def debug_specific_document(document_id: str):
+    """Debug endpoint to test getting a specific document"""
+    try:
+        result = pinecone_doc_service.get_document(document_id)
+        return {
+            "success": True,
+            "document_id": document_id,
+            "get_result": result
+        }
+    except Exception as e:
+        return {
+            "success": False,
+            "document_id": document_id,
+            "error": str(e)
+        }
+
+
 @router.delete("/knowledge-base/{entry_id}", response_model=Dict[str, Any])
 async def delete_knowledge_base_entry(entry_id: str):
     """Delete a knowledge base entry from Pinecone (soft delete)"""
