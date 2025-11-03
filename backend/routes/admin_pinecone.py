@@ -303,7 +303,7 @@ async def debug_document_ids():
     try:
         docs = pinecone_doc_service.list_documents(
             limit=100,
-            filters={"is_active": True}
+            is_active=True
         )
         
         doc_ids = [doc["id"] for doc in docs["documents"]]
