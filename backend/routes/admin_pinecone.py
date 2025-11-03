@@ -333,7 +333,9 @@ async def delete_knowledge_base_entry(entry_id: str):
         list_result = pinecone_doc_service.list_documents(limit=1000)
         existing_doc_ids = [doc["id"] for doc in list_result.get("documents", [])]
         
-        logger.info(f"Existing document IDs: {existing_doc_ids[:5]}...")  # Log first 5 IDs
+        logger.info(f"Total existing documents: {len(existing_doc_ids)}")
+        logger.info(f"Looking for document: {entry_id}")
+        logger.info(f"Document exists in list: {entry_id in existing_doc_ids}")
         
         if entry_id not in existing_doc_ids:
             logger.warning(f"Document {entry_id} not found in list of existing documents")
@@ -353,6 +355,16 @@ async def delete_knowledge_base_entry(entry_id: str):
                     status_code=404,
                     detail=f"Knowledge base entry not found: {entry_id}"
                 )
+        
+        # Try direct document get first
+        doc_result = pinecone_doc_service.get_document(entry_id)
+        logger.info(f"Direct document get result: {doc_result}")
+        
+        if not doc_result["success"]:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Document not found via direct get: {entry_id}"
+            )
         
         result = pinecone_doc_service.delete_document(
             document_id=entry_id,
