@@ -130,13 +130,9 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
       const result = await response.json();
       
       if (result.success) {
-        // Send the image upload info through the normal chat flow
-        onSendMessage(`[IMAGE_UPLOAD]${JSON.stringify({
-          filename: file.name,
-          type: result.document_info.type,
-          questions: result.questions,
-          keyInfo: result.document_info.key_information
-        })}`);
+        // Send clean message with extracted error text
+        const errorText = result.questions && result.questions[0] ? result.questions[0] : "Error text extracted from image";
+        onSendMessage(`� ${errorText}`);
         
       } else {
         console.error('Image analysis failed:', result.error);
