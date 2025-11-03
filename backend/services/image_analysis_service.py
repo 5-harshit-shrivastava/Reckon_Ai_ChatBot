@@ -92,11 +92,14 @@ class ImageAnalysisService:
         # For error screens, extract exact error text
         if "error" in doc_type.lower():
             prompt = """
-            Extract the EXACT error message from this screen. 
+            Extract ONLY the main error message from this screen.
             
-            Copy the error text word-for-word exactly as shown.
-            Do not add any explanation or interpretation.
-            Just return the exact error message text.
+            Ignore:
+            - Button text like "OK", "Cancel"
+            - Window titles
+            - Extra UI elements
+            
+            Return ONLY the core error message text that describes the problem.
             """
         else:
             prompt = """
@@ -118,9 +121,22 @@ class ImageAnalysisService:
             
             # For error screens, return exact error text
             if "error" in doc_type.lower():
-                # Extract exact error text
+                # Extract exact error text and clean it
                 error_text = response.text.strip()
-                return [error_text] if error_text else ["Error message not readable"]
+                # Remove common UI elements
+                lines = error_text.split('\n')
+                cleaned_lines = []
+                
+                for line in lines:
+                    line = line.strip()
+                    # Skip common UI elements
+                    if line.lower() in ['ok', 'cancel', 'error', 'x', 'close']:
+                        continue
+                    if line and len(line) > 3:  # Keep meaningful text
+                        cleaned_lines.append(line)
+                
+                cleaned_error = '\n'.join(cleaned_lines)
+                return [cleaned_error] if cleaned_error else ["Error message not readable"]
             
             # For other documents, parse as questions
             lines = response.text.strip().split('\n')
