@@ -120,8 +120,8 @@ class VectorSearchService:
             formatted_text = f"passage: {text}"
 
         # Call HuggingFace API
-    # Use the HF Inference Router endpoint (newer path)
-    api_url = f"https://router.huggingface.co/hf-inference/{model_name}"
+        # Use the HF Inference Router endpoint (newer path)
+        api_url = f"https://router.huggingface.co/hf-inference/{model_name}"
         headers = {
             "Authorization": f"Bearer {hf_token}",
             "Content-Type": "application/json"
