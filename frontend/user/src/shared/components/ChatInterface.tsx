@@ -338,42 +338,26 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
                         alignItems: 'center',
                         gap: 1
                       }}>
-                        💡 Questions from your document:
+                        � Extracted Text:
                       </Typography>
                       <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
                         {message.image.suggestedQuestions.map((question, index) => (
-                          <Chip
+                          <Box
                             key={index}
-                            label={question}
-                            onClick={() => handleSuggestionClick(question)}
-                            variant="outlined"
                             sx={{
-                              justifyContent: 'flex-start',
-                              height: 'auto',
-                              py: 1,
-                              px: 1.5,
-                              borderColor: '#dadce0',
-                              color: '#3c4043',
-                              fontSize: '13px',
-                              fontWeight: 400,
+                              p: 2,
+                              borderRadius: 1,
                               bgcolor: 'white',
-                              '&:hover': {
-                                bgcolor: '#f1f3f4',
-                                borderColor: '#4285f4',
-                                transform: 'translateX(-2px)',
-                                boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
-                              },
-                              transition: 'all 0.2s ease-in-out',
-                              cursor: 'pointer',
-                              textAlign: 'left',
-                              '& .MuiChip-label': {
-                                whiteSpace: 'normal',
-                                textAlign: 'left',
-                                paddingLeft: 0,
-                                paddingRight: 0
-                              }
+                              border: '1px solid #dadce0',
+                              fontSize: '13px',
+                              fontFamily: 'monospace',
+                              color: '#3c4043',
+                              whiteSpace: 'pre-line',
+                              lineHeight: 1.4
                             }}
-                          />
+                          >
+                            {question}
+                          </Box>
                         ))}
                       </Box>
                     </Box>
