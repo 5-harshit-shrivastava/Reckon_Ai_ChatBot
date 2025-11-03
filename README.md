@@ -1,4 +1,5 @@
 <!-- kardia change -->
+
 # Reckon AI ChatBot
 
 A sophisticated RAG (Retrieval-Augmented Generation) chatbot system with **Image Upload & Analysis** capabilities, featuring separate user and admin interfaces, built with FastAPI backend and React frontends.
@@ -26,6 +27,7 @@ A sophisticated RAG (Retrieval-Augmented Generation) chatbot system with **Image
 ### Local Development
 
 1. **Backend Setup**:
+
    ```bash
    cd backend
    pip install -r requirements.txt
@@ -33,6 +35,7 @@ A sophisticated RAG (Retrieval-Augmented Generation) chatbot system with **Image
    ```
 
 2. **Frontend Setup**:
+
    ```bash
    # User App
    cd frontend/user
