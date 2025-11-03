@@ -11,7 +11,6 @@ import {
 } from '@mui/material';
 import {
   Send as SendIcon,
-  Mic as MicIcon,
   SmartToy as BotIcon,
   Person as PersonIcon,
 } from '@mui/icons-material';
@@ -669,18 +668,6 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
             📸
           </IconButton>
           
-          <IconButton
-            sx={{
-              color: '#5f6368',
-              '&:hover': {
-                bgcolor: '#f8f9fa',
-                color: '#4285f4',
-              },
-              p: 1.5,
-            }}
-          >
-            <MicIcon sx={{ fontSize: 20 }} />
-          </IconButton>
           <IconButton
             onClick={handleSend}
             disabled={!inputValue.trim() || isAnalyzingImage}
