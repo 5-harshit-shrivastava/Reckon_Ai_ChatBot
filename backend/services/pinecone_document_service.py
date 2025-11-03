@@ -76,11 +76,39 @@ class PineconeDocumentService:
             # Prepare vectors for Pinecone
             vectors = []
             for chunk_data in chunks_data:
-                # Create embedding for chunk
-                embedding = self.vector_service.create_embedding(
-                    text=chunk_data['text'],
-                    is_query=False
-                )
+                # Create embedding for chunk with retry if API returned a zero-vector
+                max_retries = 2
+                embedding = None
+                for attempt in range(1, max_retries + 2):
+                    embedding = self.vector_service.create_embedding(
+                        text=chunk_data['text'],
+                        is_query=False
+                    )
+
+                    # Check for non-zero values (Pinecone rejects all-zero vectors)
+                    if embedding and any(abs(x) > 1e-9 for x in embedding):
+                        break
+
+                    logger.warning(
+                        f"Embedding attempt {attempt} for chunk {chunk_data['index']} returned all zeros."
+                    )
+
+                    # Small backoff before retry
+                    time.sleep(0.5)
+
+                # If still all zeros after retries, abort with clear error
+                if not embedding or not any(abs(x) > 1e-9 for x in embedding):
+                    err_msg = (
+                        f"Embedding generation failed for chunk index {chunk_data['index']} "
+                        f"(document_title='{title[:80]}'). Pinecone rejects zero-only vectors."
+                    )
+                    logger.error(err_msg)
+                    return {
+                        "success": False,
+                        "error": err_msg,
+                        "document_id": None,
+                        "chunks_created": 0
+                    }
 
                 # Create unique vector ID
                 vector_id = f"doc_{document_id}_chunk_{chunk_data['index']}"
