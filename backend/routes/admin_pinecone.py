@@ -329,6 +329,31 @@ async def delete_knowledge_base_entry(entry_id: str):
     try:
         logger.info(f"Attempting to delete knowledge base entry: {entry_id}")
         
+        # First check if document exists in the list
+        list_result = pinecone_doc_service.list_documents(limit=1000)
+        existing_doc_ids = [doc["id"] for doc in list_result.get("documents", [])]
+        
+        logger.info(f"Existing document IDs: {existing_doc_ids[:5]}...")  # Log first 5 IDs
+        
+        if entry_id not in existing_doc_ids:
+            logger.warning(f"Document {entry_id} not found in list of existing documents")
+            # Check if it might be already deleted (inactive)
+            inactive_result = pinecone_doc_service.list_documents(is_active=False, limit=1000)
+            inactive_doc_ids = [doc["id"] for doc in inactive_result.get("documents", [])]
+            
+            if entry_id in inactive_doc_ids:
+                return {
+                    "id": entry_id,
+                    "message": "Knowledge base entry was already deleted",
+                    "status": "success",
+                    "vectors_deleted": 0
+                }
+            else:
+                raise HTTPException(
+                    status_code=404,
+                    detail=f"Knowledge base entry not found: {entry_id}"
+                )
+        
         result = pinecone_doc_service.delete_document(
             document_id=entry_id,
             soft_delete=True  # Soft delete by default
@@ -337,10 +362,10 @@ async def delete_knowledge_base_entry(entry_id: str):
         logger.info(f"Delete result for {entry_id}: {result}")
 
         if not result["success"]:
-            logger.warning(f"Document not found for deletion: {entry_id}")
+            logger.warning(f"Document deletion failed for: {entry_id}")
             raise HTTPException(
                 status_code=404,
-                detail=f"Knowledge base entry not found: {entry_id}"
+                detail=f"Failed to delete knowledge base entry: {entry_id}"
             )
 
         return {
