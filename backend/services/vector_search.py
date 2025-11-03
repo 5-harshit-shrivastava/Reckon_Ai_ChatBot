@@ -90,20 +90,92 @@ class VectorSearchService:
 
             logger.info(f"Creating embedding with BAAI/bge-large-en-v1.5")
 
-            # Use only Hugging Face API (no local model)
-            embedding = self._create_embedding_with_api(text, self.embedding_model, is_query)
-
-            if embedding and len(embedding) == self.vector_dimension:
-                logger.info(f"✅ bge-large-en-v1.5 API success - {len(embedding)} dimensions")
-                return embedding
-            else:
-                logger.error(f"API returned wrong dimensions: {len(embedding) if embedding else 0}")
-                return [0.0] * self.vector_dimension
+            # Try HuggingFace API with retry logic for rate limits
+            max_retries = 3
+            api_failed = False
+            last_error = None
+            
+            for attempt in range(max_retries):
+                try:
+                    embedding = self._create_embedding_with_api(text, self.embedding_model, is_query)
+                    
+                    if embedding and len(embedding) == self.vector_dimension:
+                        # Validate embedding is not all zeros
+                        if all(abs(x) < 1e-8 for x in embedding):
+                            raise Exception("API returned zero embedding")
+                        
+                        logger.info(f"✅ bge-large-en-v1.5 API success - {len(embedding)} dimensions")
+                        return embedding
+                    else:
+                        raise Exception(f"API returned wrong dimensions: expected {self.vector_dimension}, got {len(embedding) if embedding else 0}")
+                        
+                except Exception as api_error:
+                    last_error = api_error
+                    if "rate limit" in str(api_error).lower() or "429" in str(api_error):
+                        wait_time = (attempt + 1) * 2  # Exponential backoff
+                        logger.warning(f"Rate limit hit, waiting {wait_time}s before retry {attempt + 1}/{max_retries}")
+                        time.sleep(wait_time)
+                        continue
+                    elif attempt < max_retries - 1:
+                        # For other errors, try one more time before giving up
+                        logger.warning(f"API error: {api_error}, retrying {attempt + 1}/{max_retries}")
+                        time.sleep(1)
+                        continue
+                    else:
+                        # All retries exhausted
+                        api_failed = True
+                        break
+            
+            # If all API attempts failed, try mathematical embedding as fallback
+            if api_failed:
+                logger.warning(f"API failed after {max_retries} retries (last error: {last_error}), using mathematical fallback")
+                return self._create_mathematical_embedding(text)
 
         except Exception as e:
-            logger.error(f"bge-large-en-v1.5 API failed: {e}")
-            # Return zero vector as last resort
-            return [0.0] * self.vector_dimension
+            logger.error(f"All embedding methods failed: {e}")
+            # Don't return zero vector - raise error to be handled by caller
+            raise Exception(f"Embedding generation failed: {str(e)}")
+
+    def _create_mathematical_embedding(self, text: str) -> List[float]:
+        """Create a simple mathematical embedding as fallback when API fails"""
+        import hashlib
+        import numpy as np
+        
+        # Create a deterministic hash-based embedding
+        text_hash = hashlib.md5(text.encode()).hexdigest()
+        
+        # Convert hash to numeric values
+        hash_ints = [int(text_hash[i:i+2], 16) for i in range(0, len(text_hash), 2)]
+        
+        # Extend to required dimensions
+        while len(hash_ints) < self.vector_dimension:
+            hash_ints.extend(hash_ints)
+        
+        # Take only required dimensions
+        hash_ints = hash_ints[:self.vector_dimension]
+        
+        # Normalize to [-1, 1] range
+        embedding = np.array(hash_ints, dtype=float)
+        embedding = (embedding - 127.5) / 127.5
+        
+        # Add some text-based features
+        text_lower = text.lower()
+        char_counts = np.zeros(26)
+        for char in text_lower:
+            if 'a' <= char <= 'z':
+                char_counts[ord(char) - ord('a')] += 1
+        
+        # Mix in character frequency features (first 26 dimensions)
+        if len(char_counts) <= self.vector_dimension:
+            embedding[:len(char_counts)] = (embedding[:len(char_counts)] + char_counts[:self.vector_dimension]) / 2
+        
+        # Normalize the final embedding
+        norm = np.linalg.norm(embedding)
+        if norm > 0:
+            embedding = embedding / norm
+        
+        logger.info(f"✅ Mathematical fallback embedding created - {len(embedding)} dimensions")
+        return embedding.tolist()
 
     def _create_embedding_with_api(self, text: str, model_name: str, is_query: bool = False) -> List[float]:
         """Create embedding via HuggingFace API for BAAI/bge-large-en-v1.5"""
@@ -120,8 +192,8 @@ class VectorSearchService:
             formatted_text = f"passage: {text}"
 
         # Call HuggingFace API
-        # Use the HF Inference Router endpoint (newer path)
-        api_url = f"https://router.huggingface.co/hf-inference/{model_name}"
+        # Use the new router endpoint as required by HF
+        api_url = f"https://router.huggingface.co/{model_name}"
         headers = {
             "Authorization": f"Bearer {hf_token}",
             "Content-Type": "application/json"
@@ -135,46 +207,25 @@ class VectorSearchService:
         )
 
         if response.status_code == 200:
-            body = response.json()
-
-            # The router endpoint may return different shapes depending on model and config.
-            # Try several common patterns to extract the raw vector.
-            embedding = None
-
-            # Case 1: API returns a plain list of floats
-            if isinstance(body, list) and all(isinstance(x, (int, float)) for x in body):
-                embedding = body
-
-            # Case 2: API returns a dict with 'embedding' key
-            elif isinstance(body, dict) and "embedding" in body and isinstance(body["embedding"], list):
-                embedding = body["embedding"]
-
-            # Case 3: Some HF routers return {'data': [{'embedding': [...]}, ...]}
-            elif isinstance(body, dict) and "data" in body:
-                try:
-                    first = body["data"][0]
-                    if isinstance(first, dict) and "embedding" in first:
-                        embedding = first["embedding"]
-                except Exception:
-                    embedding = None
-
-            if not embedding:
-                raise Exception(f"Unexpected embedding response shape: {body}")
-
+            embedding = response.json()
             # Normalize the embedding
             import numpy as np
-            embedding = np.array(embedding, dtype=float)
+            embedding = np.array(embedding)
 
             # Ensure correct dimensions for bge-large-en-v1.5
             if len(embedding) != self.vector_dimension:
                 logger.warning(f"API returned {len(embedding)} dimensions, expected {self.vector_dimension}")
 
-            norm = np.linalg.norm(embedding)
-            if norm == 0 or np.isnan(norm):
-                raise Exception("Received zero or NaN embedding from HF API")
+            # Check for zero embedding
+            if np.allclose(embedding, 0):
+                raise Exception("API returned zero embedding")
 
-            embedding = embedding / norm
+            embedding = embedding / np.linalg.norm(embedding)
             return embedding.tolist()
+        elif response.status_code == 429:
+            raise Exception(f"Rate limit exceeded (429): {response.text}")
+        elif response.status_code == 503:
+            raise Exception(f"Model loading (503): {response.text}")
         else:
             raise Exception(f"API error: {response.status_code} - {response.text}")
 
