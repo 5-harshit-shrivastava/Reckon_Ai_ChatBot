@@ -55,14 +55,14 @@ class ImageAnalysisService:
                 image.thumbnail((1024, 1024), Image.Resampling.LANCZOS)
                 logger.info(f"Resized image from {image.width}x{image.height} to fit within 1024x1024")
             
-            # Generate questions using Gemini Vision
-            questions = await self._generate_questions_from_image(image)
+            # Get document type analysis first
+            doc_type = await self._analyze_document_type(image)
+            
+            # Generate questions using Gemini Vision (context-aware)
+            questions = await self._generate_questions_from_image(image, doc_type)
             
             # Extract key information
             key_info = await self._extract_key_information(image)
-            
-            # Get document type analysis
-            doc_type = await self._analyze_document_type(image)
             
             logger.info(f"Successfully analyzed image: {filename}, found {len(questions)} questions")
             
@@ -86,25 +86,33 @@ class ImageAnalysisService:
                 "filename": filename
             }
     
-    async def _generate_questions_from_image(self, image: Image.Image) -> List[str]:
+    async def _generate_questions_from_image(self, image: Image.Image, doc_type: str = "") -> List[str]:
         """Generate relevant questions from business document image"""
         
-        prompt = """
-        Analyze this business document and generate 3-4 direct, professional questions.
+        # Adjust prompt based on document type
+        if "error" in doc_type.lower():
+            prompt = """
+            This is an error screen. Generate only 2 simple questions:
+            1. How to fix this error?
+            2. Who should handle this?
+            
+            Keep questions under 10 words each.
+            """
+        else:
+            prompt = """
+            Look at this document and generate ONLY relevant questions based on what you actually see.
 
-        Requirements:
-        - Use specific details from the image
-        - Maximum 15 words per question
-        - Focus on actionable business decisions
-        - Professional business language only
+            If it's a simple error message: Generate 2-3 questions maximum
+            If it's a complex business document: Generate 3-4 questions maximum
 
-        Examples:
-        "Should we approve this ₹25,000 invoice?"
-        "Why is Item X showing stock shortage?"
-        "How to resolve this system error immediately?"
+            Focus on:
+            - What actually needs to be done
+            - Who should handle it
+            - What's the impact
 
-        Generate 3-4 questions only, no explanations.
-        """
+            Keep questions under 12 words. Be specific to what you see.
+            Generate only as many questions as make sense for this document.
+            """
         
         try:
             response = self.model.generate_content([prompt, image])
@@ -129,20 +137,30 @@ class ImageAnalysisService:
                 if line and '?' in line and len(line) > 10:  # Reduced for better responses
                     questions.append(line)
             
-            # Return fallback questions if none generated
+            # Return fallback questions based on document type
             if not questions:
-                return [
-                    "What is the status of this document?",
-                    "Does this need approval?",
-                    "What are the next steps?"
-                ]
+                if "error" in doc_type.lower():
+                    return [
+                        "How to fix this error?",
+                        "Who should handle this?"
+                    ]
+                else:
+                    return [
+                        "What needs to be done?",
+                        "Who should handle this?"
+                    ]
             
-            # Limit to 4 questions maximum
-            return questions[:4]
+            # Limit questions based on document type
+            max_questions = 2 if "error" in doc_type.lower() else 3
+            return questions[:max_questions]
             
         except Exception as e:
             logger.error(f"Error generating questions: {str(e)}")
-            return []
+            # Return simple fallback questions
+            return [
+                "How to fix this error?",
+                "Who should handle this?"
+            ]
     
     async def _extract_key_information(self, image: Image.Image) -> str:
         """Extract key textual information from the image"""
