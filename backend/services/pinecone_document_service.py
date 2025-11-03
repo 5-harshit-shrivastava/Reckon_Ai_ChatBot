@@ -166,7 +166,7 @@ class PineconeDocumentService:
 
             # Query Pinecone to get all matching vectors
             # We'll use a dummy vector for filtering purposes
-            dummy_vector = [0.0] * self.vector_service.vector_dimension
+            dummy_vector = [0.0] * 1024  # bge-large-en-v1.5 dimensions
 
             query_response = self.pinecone_index.query(
                 namespace=self.namespace,
@@ -245,7 +245,7 @@ class PineconeDocumentService:
         try:
             # Fetch all vectors for this document
             filter_dict = {"document_id": {"$eq": document_id}}
-            dummy_vector = [0.0] * self.vector_service.vector_dimension
+            dummy_vector = [0.0] * 1024  # bge-large-en-v1.5 dimensions
 
             query_response = self.pinecone_index.query(
                 namespace=self.namespace,
@@ -346,13 +346,15 @@ class PineconeDocumentService:
             # If only metadata changed, update all vectors
             else:
                 filter_dict = {"document_id": {"$eq": document_id}}
-                dummy_vector = [0.0] * self.vector_service.vector_dimension
+                # Use hardcoded dimension to avoid dimension mismatch
+                dummy_vector = [0.0] * 1024  # bge-large-en-v1.5 dimensions
 
                 query_response = self.pinecone_index.query(
                     namespace=self.namespace,
                     vector=dummy_vector,
                     top_k=10000,
                     include_metadata=True,
+                    include_values=True,  # Need to include values for upsert
                     filter=filter_dict
                 )
 
@@ -419,7 +421,7 @@ class PineconeDocumentService:
             else:
                 # Actually delete vectors
                 filter_dict = {"document_id": {"$eq": document_id}}
-                dummy_vector = [0.0] * self.vector_service.vector_dimension
+                dummy_vector = [0.0] * 1024  # bge-large-en-v1.5 dimensions
 
                 query_response = self.pinecone_index.query(
                     namespace=self.namespace,
@@ -461,7 +463,7 @@ class PineconeDocumentService:
             stats = self.pinecone_index.describe_index_stats()
 
             # Query to get all active documents
-            dummy_vector = [0.0] * self.vector_service.vector_dimension
+            dummy_vector = [0.0] * 1024  # bge-large-en-v1.5 dimensions
             query_response = self.pinecone_index.query(
                 namespace=self.namespace,
                 vector=dummy_vector,
