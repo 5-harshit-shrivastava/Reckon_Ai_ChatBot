@@ -42,7 +42,7 @@ class DocumentUpdate(BaseModel):
     is_active: Optional[bool] = None
 
 class DocumentResponse(BaseModel):
-    id: int
+    id: str  # Changed from int to str for UUID support
     title: str
     content: str
     document_type: str
@@ -112,8 +112,8 @@ class DocumentSearchRequest(BaseModel):
     min_confidence: Optional[float] = Field(0.0, ge=0.0, le=1.0)
 
 class SearchResult(BaseModel):
-    chunk_id: int
-    document_id: int
+    chunk_id: str  # Changed from int to str for UUID support
+    document_id: str  # Changed from int to str for UUID support
     document_title: str
     chunk_text: str
     chunk_index: int

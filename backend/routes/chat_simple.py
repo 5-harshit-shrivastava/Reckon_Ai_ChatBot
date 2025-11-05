@@ -76,6 +76,7 @@ async def create_session(request: CreateSessionRequest):
         return {
             "success": True,
             "message": "Session created successfully",
+            "id": session_id,  # Add id at top level for easier access
             "data": {
                 "session": {
                     "id": session_id,
