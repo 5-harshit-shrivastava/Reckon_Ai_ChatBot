@@ -50,7 +50,8 @@ allowed_origins = [
     "https://reckonadmin.vercel.app",
     "https://reckonadmin-wine.vercel.app",
     "https://reckonadmin-lr7tlw0c6-5-harshit-shrivastavas-projects.vercel.app",
-    "https://bckreckon.vercel.app"
+    "https://bckreckon.vercel.app",
+    "https://reckonuser-robr6eukv-5-harshit-shrivastavas-projects.vercel.app"
 ]
 
 app.add_middleware(
