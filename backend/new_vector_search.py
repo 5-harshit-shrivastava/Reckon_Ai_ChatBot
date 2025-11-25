@@ -23,7 +23,7 @@ class NewVectorSearchService:
         self.vector_dimension = 1024  # bge-large-en-v1.5 dimensions
         self.context_length = 8000  # Model context length
         self.model_description = "BAAI/bge-large-en-v1.5 via HuggingFace Hub API - High-quality multilingual embeddings"
-        self.index_name = "reckon-knowledge-base"
+        self.index_name = "reckon-bge-large-kb"  # Use same index as admin
         self.initialize_services()
     
     def initialize_services(self):
