@@ -298,8 +298,10 @@ class NewVectorSearchService:
         """
         try:
             if not self.pinecone_index:
-                logger.error("Pinecone index not available")
+                logger.error("VECTOR SEARCH DEBUG: Pinecone index not available")
                 return []
+            
+            logger.info(f"VECTOR SEARCH DEBUG: Starting semantic search for query: '{query}' with top_k={top_k}")
             
             # Build metadata filters
             filters = {}
@@ -310,8 +312,11 @@ class NewVectorSearchService:
             if industry_types:
                 filters["industry_type"] = {"$in": industry_types}
             
+            logger.info(f"VECTOR SEARCH DEBUG: Applied filters: {filters}")
+            
             # Create query embedding (with query prefix)
             query_embedding = self.create_embedding(query, is_query=True)
+            logger.info(f"VECTOR SEARCH DEBUG: Created embedding with {len(query_embedding)} dimensions")
 
             # Search in our namespace
             search_response = self.pinecone_index.query(
@@ -323,9 +328,11 @@ class NewVectorSearchService:
             )
 
             results = []
-            logger.info(f"Semantic search found {len(search_response.matches)} matches in namespace 'reckon-knowledge-base'")
+            logger.info(f"VECTOR SEARCH DEBUG: Pinecone returned {len(search_response.matches)} matches in namespace 'reckon-knowledge-base'")
             
-            for match in search_response.matches:
+            for i, match in enumerate(search_response.matches):
+                logger.info(f"VECTOR SEARCH DEBUG: Match {i+1} - Score: {match.score:.4f}, ID: {match.id}")
+                
                 # Get chunk text from metadata
                 chunk_text = match.metadata.get("text", match.metadata.get("chunk_text", ""))
                 

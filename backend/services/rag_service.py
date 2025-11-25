@@ -161,20 +161,26 @@ class RAGService:
                 min_confidence=0.0
             )
             
-            # STRICT RELEVANCE FILTERING
+            logger.info(f"SEARCH DEBUG: Got {len(search_results)} raw results from semantic_search for query '{query}'")
+            if search_results:
+                logger.info(f"SEARCH DEBUG: First result similarity score: {search_results[0].get('similarity_score', 'N/A')}")
+            
+            # STRICT RELEVANCE FILTERING - LOWERED THRESHOLD FOR BETTER RECALL
             # Filter out results with very low similarity scores
-            MIN_SIMILARITY_THRESHOLD = 0.15  # Lowered threshold to include more relevant content
+            MIN_SIMILARITY_THRESHOLD = 0.05  # Significantly lowered threshold
             
             filtered_results = []
-            for result in search_results:
+            for i, result in enumerate(search_results):
                 similarity_score = result.get("similarity_score", 0.0)
+                
+                logger.info(f"SEARCH DEBUG: Result {i+1} - similarity: {similarity_score:.4f}, text preview: {result.get('chunk_text', '')[:50]}...")
                 
                 # Only include results with meaningful similarity
                 if similarity_score >= MIN_SIMILARITY_THRESHOLD:
                     filtered_results.append(result)
-                    logger.info(f"Included result with similarity: {similarity_score:.3f} for query '{query}'")
+                    logger.info(f"✅ Included result with similarity: {similarity_score:.4f} for query '{query}'")
                 else:
-                    logger.info(f"Filtered out low similarity result: {similarity_score:.3f} for query '{query}'")
+                    logger.info(f"❌ Filtered out low similarity result: {similarity_score:.4f} for query '{query}'")
             
             # If no results meet the threshold, return empty list
             if not filtered_results:
