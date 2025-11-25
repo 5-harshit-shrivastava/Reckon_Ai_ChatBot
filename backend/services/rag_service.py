@@ -3,7 +3,7 @@ import time
 import json
 from typing import List, Dict, Optional, Tuple
 from sqlalchemy.orm import Session
-from services.vector_search import VectorSearchService
+from new_vector_search import NewVectorSearchService
 from services.gemini_service import GeminiService
 from models.knowledge_base import Document, DocumentChunk, KnowledgeBaseQuery
 from models.chat import ChatSession
@@ -18,7 +18,7 @@ class RAGService:
     """
     
     def __init__(self):
-        self.vector_search = VectorSearchService()
+        self.vector_search = NewVectorSearchService()
         self.gemini_service = None
         self.model_name = "gemini-pro"  # Primary model
         self.max_context_tokens = 8000  # Leave room for response
@@ -152,13 +152,13 @@ class RAGService:
             document_types = None
             industry_types = [industry_context] if industry_context else None
             
-            # Use hybrid search for better results
-            search_results = self.vector_search.hybrid_search(
-                db=db,
+            # Use semantic search for better results with NewVectorSearchService
+            search_results = self.vector_search.semantic_search(
                 query=query,
                 top_k=top_k,
                 document_types=document_types,
-                industry_types=industry_types
+                industry_types=industry_types,
+                min_confidence=0.0
             )
             
             # STRICT RELEVANCE FILTERING

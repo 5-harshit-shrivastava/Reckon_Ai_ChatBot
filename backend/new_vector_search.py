@@ -253,7 +253,7 @@ class NewVectorSearchService:
                 vector=query_embedding,
                 top_k=top_k,
                 include_metadata=True,
-                namespace=namespace
+                namespace=namespace or "reckon-knowledge-base"
             )
             
             results = []
@@ -273,4 +273,145 @@ class NewVectorSearchService:
             
         except Exception as e:
             logger.error(f"Error searching similar chunks: {e}")
+            return []
+
+    def semantic_search(
+        self, 
+        query: str, 
+        top_k: int = 5,
+        document_types: List[str] = None,
+        industry_types: List[str] = None,
+        min_confidence: float = 0.0
+    ) -> List[Dict]:
+        """
+        Perform semantic search using Pinecone with new HuggingFace embeddings
+        
+        Args:
+            query: Search query
+            top_k: Number of results to return
+            document_types: Filter by document types
+            industry_types: Filter by industry types
+            min_confidence: Minimum confidence score
+            
+        Returns:
+            List of search results with similarity scores
+        """
+        try:
+            if not self.pinecone_index:
+                logger.error("Pinecone index not available")
+                return []
+            
+            # Build metadata filters
+            filters = {}
+            if min_confidence > 0:
+                filters["confidence_score"] = {"$gte": min_confidence}
+            if document_types:
+                filters["document_type"] = {"$in": document_types}
+            if industry_types:
+                filters["industry_type"] = {"$in": industry_types}
+            
+            # Create query embedding (with query prefix)
+            query_embedding = self.create_embedding(query, is_query=True)
+
+            # Search in our namespace
+            search_response = self.pinecone_index.query(
+                namespace="reckon-knowledge-base",
+                vector=query_embedding,
+                top_k=top_k,
+                include_metadata=True,
+                filter=filters if filters else None
+            )
+
+            results = []
+            logger.info(f"Semantic search found {len(search_response.matches)} matches in namespace 'reckon-knowledge-base'")
+            
+            for match in search_response.matches:
+                # Get chunk text from metadata
+                chunk_text = match.metadata.get("text", match.metadata.get("chunk_text", ""))
+                
+                # Get IDs from metadata
+                chunk_id = match.metadata.get("chunk_id")
+                document_id = match.metadata.get("document_id")
+                
+                # If chunk_id is None, extract from vector ID
+                if chunk_id is None and match.id:
+                    try:
+                        if "_chunk_" in match.id:
+                            chunk_index = match.id.split("_chunk_")[-1]
+                            chunk_id = f"{document_id}_chunk_{chunk_index}"
+                    except:
+                        chunk_id = match.id
+                
+                # Convert chunk_id to int if possible
+                if chunk_id is not None:
+                    try:
+                        chunk_id = int(float(chunk_id))
+                    except (ValueError, TypeError):
+                        chunk_id = str(chunk_id)
+                
+                result = {
+                    "id": match.id,
+                    "chunk_id": chunk_id,
+                    "document_id": document_id,
+                    "similarity_score": float(match.score),
+                    "confidence_score": float(match.score),  # Added for compatibility
+                    "chunk_text": chunk_text,  # Changed from 'text' to 'chunk_text'
+                    "text": chunk_text,  # Keep both for backward compatibility
+                    "document_title": match.metadata.get("document_title", "Unknown"),
+                    "document_type": match.metadata.get("document_type", "Unknown"),
+                    "industry_type": match.metadata.get("industry_type", "Unknown"),
+                    "chunk_index": match.metadata.get("chunk_index", 0),
+                    "section_title": match.metadata.get("section_title", ""),  # Added for RAG service
+                    "metadata": match.metadata
+                }
+                results.append(result)
+            
+            logger.info(f"Semantic search returned {len(results)} results for query: {query[:50]}...")
+            return results
+            
+        except Exception as e:
+            logger.error(f"Error in semantic search: {e}")
+            return []
+
+    def hybrid_search(
+        self,
+        db: Any = None,
+        query: str = "",
+        top_k: int = 5,
+        semantic_weight: float = 0.7,
+        text_weight: float = 0.3,
+        document_types: List[str] = None,
+        industry_types: List[str] = None
+    ) -> List[Dict]:
+        """
+        Combine semantic search with traditional text search
+        
+        Args:
+            db: Database session
+            query: Search query
+            top_k: Number of results to return
+            semantic_weight: Weight for semantic similarity
+            text_weight: Weight for text matching
+            document_types: Filter by document types
+            industry_types: Filter by industry types
+            
+        Returns:
+            Combined search results
+        """
+        try:
+            # Get semantic search results with new embeddings
+            semantic_results = self.semantic_search(
+                query=query,
+                top_k=top_k * 2,  # Get more results for reranking
+                document_types=document_types,
+                industry_types=industry_types
+            )
+            
+            # For now, just use semantic results since we have proper embeddings
+            # Text search can be added later if needed
+            logger.info(f"Hybrid search returning {len(semantic_results[:top_k])} results for query: {query[:50]}...")
+            return semantic_results[:top_k]
+            
+        except Exception as e:
+            logger.error(f"Error in hybrid search: {e}")
             return []
