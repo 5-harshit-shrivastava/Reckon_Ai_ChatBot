@@ -163,7 +163,7 @@ class RAGService:
             
             # STRICT RELEVANCE FILTERING
             # Filter out results with very low similarity scores
-            MIN_SIMILARITY_THRESHOLD = 0.55  # Lowered threshold to include relevant content
+            MIN_SIMILARITY_THRESHOLD = 0.15  # Lowered threshold to include more relevant content
             
             filtered_results = []
             for result in search_results:

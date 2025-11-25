@@ -192,7 +192,7 @@ class VectorSearchService:
             formatted_text = f"passage: {text}"
 
         # Call HuggingFace API
-        # Use the new router endpoint as required by HF
+        # Use the router endpoint as required by HF
         api_url = f"https://router.huggingface.co/{model_name}"
         headers = {
             "Authorization": f"Bearer {hf_token}",
@@ -202,12 +202,18 @@ class VectorSearchService:
         response = requests.post(
             api_url,
             headers=headers,
-            json={"inputs": formatted_text, "options": {"wait_for_model": True}},
+            json={"inputs": [formatted_text]},  # Send as array
             timeout=30
         )
 
         if response.status_code == 200:
-            embedding = response.json()
+            result = response.json()
+            # Router returns array of arrays, get the first embedding
+            if isinstance(result, list) and len(result) > 0:
+                embedding = result[0]
+            else:
+                embedding = result
+                
             # Normalize the embedding
             import numpy as np
             embedding = np.array(embedding)
