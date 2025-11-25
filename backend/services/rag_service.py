@@ -165,9 +165,9 @@ class RAGService:
             if search_results:
                 logger.info(f"SEARCH DEBUG: First result similarity score: {search_results[0].get('similarity_score', 'N/A')}")
             
-            # STRICT RELEVANCE FILTERING - LOWERED THRESHOLD FOR BETTER RECALL
+            # STRICT RELEVANCE FILTERING - EXTREMELY LOW THRESHOLD FOR TESTING  
             # Filter out results with very low similarity scores
-            MIN_SIMILARITY_THRESHOLD = 0.05  # Significantly lowered threshold
+            MIN_SIMILARITY_THRESHOLD = 0.01  # Very low threshold to include more results
             
             filtered_results = []
             for i, result in enumerate(search_results):
