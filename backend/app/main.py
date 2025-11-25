@@ -25,7 +25,6 @@ try:
     from routes.admin_pinecone import router as admin_router
     from routes.chat_simple import router as chat_router
     from routes.admin_utils import router as admin_utils_router
-    from routes.debug_search import router as debug_router  # Add debug router
     routes_available = True
     print("✅ Routes imported successfully")
 except ImportError as e:
@@ -104,6 +103,108 @@ async def debug():
         }
     }
 
+@app.get("/debug/search-status")
+async def debug_search_status():
+    """Debug search service status"""
+    try:
+        # Import here to avoid startup issues
+        from new_vector_search import NewVectorSearchService
+        
+        search_service = NewVectorSearchService()
+        
+        status = {
+            "pinecone_connected": bool(search_service.pinecone_index),
+            "hf_client_available": bool(search_service.hf_client),
+            "index_name": search_service.index_name,
+            "embedding_model": search_service.embedding_model,
+            "vector_dimension": search_service.vector_dimension
+        }
+        
+        # Test index stats if connected
+        if search_service.pinecone_index:
+            try:
+                index_stats = search_service.pinecone_index.describe_index_stats()
+                status["index_stats"] = {
+                    "total_vector_count": index_stats.total_vector_count,
+                    "namespaces": list(index_stats.namespaces.keys()) if index_stats.namespaces else [],
+                    "dimension": index_stats.dimension
+                }
+                
+                # Check our specific namespace
+                if "reckon-knowledge-base" in index_stats.namespaces:
+                    namespace_stats = index_stats.namespaces["reckon-knowledge-base"]
+                    status["reckon_namespace"] = {
+                        "vector_count": namespace_stats.vector_count
+                    }
+                else:
+                    status["reckon_namespace"] = {"vector_count": 0, "error": "Namespace not found"}
+                    
+            except Exception as e:
+                status["index_stats_error"] = str(e)
+        
+        # Test embedding creation
+        try:
+            test_embedding = search_service.create_embedding("test query", is_query=True)
+            status["embedding_test"] = {
+                "success": True,
+                "dimensions": len(test_embedding) if test_embedding else 0,
+                "sample_values": test_embedding[:3] if test_embedding else []
+            }
+        except Exception as e:
+            status["embedding_test"] = {
+                "success": False,
+                "error": str(e)
+            }
+        
+        return {
+            "success": True,
+            "status": status
+        }
+        
+    except Exception as e:
+        return {
+            "success": False,
+            "error": str(e)
+        }
+
+@app.get("/debug/test-search/{query}")
+async def debug_test_search(query: str):
+    """Test search with specific query"""
+    try:
+        from new_vector_search import NewVectorSearchService
+        
+        search_service = NewVectorSearchService()
+        
+        results = search_service.semantic_search(
+            query=query,
+            top_k=10,
+            min_confidence=0.0
+        )
+        
+        formatted_results = []
+        for result in results:
+            formatted_results.append({
+                "chunk_text": result.get("chunk_text", "")[:200],
+                "similarity_score": result.get("similarity_score", 0),
+                "document_title": result.get("document_title", ""),
+                "document_type": result.get("document_type", ""),
+                "metadata_keys": list(result.get("metadata", {}).keys())
+            })
+        
+        return {
+            "success": True,
+            "query": query,
+            "results_count": len(results),
+            "results": formatted_results
+        }
+        
+    except Exception as e:
+        return {
+            "success": False,
+            "error": str(e),
+            "query": query
+        }
+
 @app.options("/{path:path}")
 async def options_handler(path: str):
     """Handle CORS preflight requests"""
@@ -115,7 +216,6 @@ if routes_available:
     app.include_router(admin_router)
     app.include_router(chat_router)
     app.include_router(admin_utils_router)
-    app.include_router(debug_router)  # Add debug router
 
 # For Vercel deployment
 app_handler = app
