@@ -25,6 +25,7 @@ try:
     from routes.admin_pinecone import router as admin_router
     from routes.chat_simple import router as chat_router
     from routes.admin_utils import router as admin_utils_router
+    from routes.debug_search import router as debug_router  # Add debug router
     routes_available = True
     print("✅ Routes imported successfully")
 except ImportError as e:
@@ -114,6 +115,7 @@ if routes_available:
     app.include_router(admin_router)
     app.include_router(chat_router)
     app.include_router(admin_utils_router)
+    app.include_router(debug_router)  # Add debug router
 
 # For Vercel deployment
 app_handler = app
