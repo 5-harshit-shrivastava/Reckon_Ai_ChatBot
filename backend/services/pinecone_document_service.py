@@ -11,7 +11,7 @@ from typing import List, Dict, Optional, Any
 from datetime import datetime
 from pinecone import Pinecone
 from loguru import logger
-from services.vector_search import VectorSearchService
+from new_vector_search import NewVectorSearchService
 from services.document_processor import DocumentProcessor
 
 
@@ -38,7 +38,7 @@ class PineconeDocumentService:
     """
 
     def __init__(self):
-        self.vector_service = VectorSearchService()
+        self.vector_service = NewVectorSearchService()
         self.document_processor = DocumentProcessor()
         self.pinecone_index = self.vector_service.pinecone_index
         self.namespace = "reckon-knowledge-base"
@@ -77,10 +77,15 @@ class PineconeDocumentService:
             vectors = []
             for chunk_data in chunks_data:
                 # Create embedding for chunk
-                embedding = self.vector_service.create_embedding(
-                    text=chunk_data['text'],
-                    is_query=False
-                )
+                try:
+                    embedding = self.vector_service.create_embedding(
+                        text=chunk_data['text'],
+                        is_query=False
+                    )
+                    logger.info(f"✅ EMBEDDING SUCCESS for chunk: '{chunk_data['text'][:50]}...' - dimensions: {len(embedding)}")
+                except Exception as embed_error:
+                    logger.error(f"❌ EMBEDDING FAILED for chunk: '{chunk_data['text'][:50]}...' - error: {embed_error}")
+                    continue  # Skip this chunk if embedding fails
 
                 # Create unique vector ID
                 vector_id = f"doc_{document_id}_chunk_{chunk_data['index']}"
