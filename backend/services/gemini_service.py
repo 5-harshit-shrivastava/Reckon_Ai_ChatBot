@@ -3,6 +3,10 @@ import time
 from typing import Dict, Optional
 import google.generativeai as genai
 from loguru import logger
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
 
 
 class GeminiService:
