@@ -372,4 +372,4 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ---
 
-**Built with ❤️ using modern AI and web technologies**
+**Built with ❤️ by harshit**
